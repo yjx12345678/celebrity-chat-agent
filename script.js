@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 这里应该是实际的API密钥和密钥，您需要从星火平台获取
             // 注意：实际应用中应该使用后端来保护这些密钥
             const API_KEY = apiKey;
-            const API_SECRET = "您的API_SECRET"; // 需要从星火平台获取
+            const API_SECRET = "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw"; // 需要从星火平台获取
             
             try {
                 const url = getAuthParams(API_KEY, API_SECRET);
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const celebrityInfo = getCelebrityInfo(currentCelebrity);
                     const requestData = {
                         header: {
-                            app_id: "您的APP_ID", // 需要从星火平台获取
+                            app_id: "11fa6957", // 需要从星火平台获取
                             uid: "user123"
                         },
                         parameter: {
