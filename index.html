@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>明星分身聊天室</title>
+    <title>明星分身聊天室 - 星火大模型版</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
             <h1>明星分身聊天室</h1>
-            <p>与您喜爱的明星AI分身畅快聊天</p>
+            <p>与您喜爱的明星AI分身畅快聊天（星火大模型驱动）</p>
             <div class="celebrity-selector">
                 <button class="celebrity-btn active" data-celebrity="jay">周杰伦</button>
                 <button class="celebrity-btn" data-celebrity="taylor">泰勒·斯威夫特</button>
@@ -38,16 +38,18 @@
     </div>
     
     <div class="api-key-container">
-        <input type="password" class="api-key-input" id="apiKeyInput" placeholder="输入OpenAI API密钥（可选）">
+        <input type="password" class="api-key-input" id="apiKeyInput" placeholder="输入星火大模型API密钥（可选，使用模拟对话可不填）">
         <button id="saveApiKey">保存密钥</button>
         <button id="clearChat">清空对话</button>
+        <button id="toggleSimulation">切换模拟模式</button>
     </div>
     
     <div class="info">
-        <p>注意：本演示需要您提供自己的OpenAI API密钥，密钥仅存储在您的浏览器中，不会发送到我们的服务器。</p>
-        <p>明星对话风格通过分析社交媒体内容模拟实现，具备记忆功能，可以记住之前的对话内容。</p>
+        <p>注意：使用真实API需要您提供自己的星火大模型API密钥，密钥仅存储在您的浏览器中。</p>
+        <p>当前模式: <span id="currentMode">模拟对话模式</span></p>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
