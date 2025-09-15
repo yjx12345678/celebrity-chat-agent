@@ -210,3 +210,22 @@ button:hover {
         width: 100%;
     }
 }
+
+.typing {
+    color: #666;
+    font-style: italic;
+}
+
+.api-key-container {
+    /* 调整布局以容纳新按钮 */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+.api-key-container button {
+    /* 确保按钮样式一致 */
+    white-space: nowrap;
+}
