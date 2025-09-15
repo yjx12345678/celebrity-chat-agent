@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 这里应该是实际的API密钥和密钥，您需要从星火平台获取
             // 注意：实际应用中应该使用后端来保护这些密钥
-            const API_KEY = apiKey;
+            const API_KEY = f57667d9f972963adacc2bc7a506f55f;
             const API_SECRET = "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw"; // 需要从星火平台获取
             
             try {
