@@ -11,12 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let apiKey = '';
     let conversationHistory = [];
     
-    // 星火大模型API配置 - 请替换为您的实际值
+    // 星火大模型API配置 - 使用X1-32K版本
     const SPARK_CONFIG = {
-        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw", // 替换为您的API_SECRET
-        APP_ID: "11fa6957", // 替换为您的APP_ID
+        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw", // 您的APISecret
+        APP_ID: "11fa6957", // 您的APPID
         HOST: "spark-api.xf-yun.com",
-        PATH: "/v1.1/chat"
+        PATH: "/v1/x1", // X1-32K版本的接口路径
+        DOMAIN: "generalv2" // X1-32K版本使用generalv2域
     };
     
     // 从localStorage加载数据
@@ -32,22 +33,26 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (savedCelebrity) {
             currentCelebrity = savedCelebrity;
-            document.querySelectorAll('.celebrity-btn').forEach(btn => {
-                if (btn.dataset.celebrity === currentCelebrity) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
+            updateCelebrityButtons();
         }
         
         if (savedHistory) {
             conversationHistory = JSON.parse(savedHistory);
             renderConversationHistory();
         } else {
-            // 添加初始欢迎消息
-            addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity));
+            addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity), false);
         }
+    }
+    
+    // 更新明星按钮状态
+    function updateCelebrityButtons() {
+        celebrityButtons.forEach(btn => {
+            if (btn.dataset.celebrity === currentCelebrity) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
     }
     
     // 渲染对话历史
@@ -125,8 +130,21 @@ document.addEventListener('DOMContentLoaded', function() {
             saveToStorage();
         }
         
-        // 滚动到底部
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // 验证API配置
+    function validateAPIConfig() {
+        if (!apiKey) {
+            return "请先设置API密钥";
+        }
+        if (!SPARK_CONFIG.API_SECRET) {
+            return "请配置正确的API_SECRET";
+        }
+        if (!SPARK_CONFIG.APP_ID) {
+            return "请配置正确的APP_ID";
+        }
+        return null;
     }
     
     // 生成WebSocket所需的鉴权参数
@@ -135,37 +153,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const path = SPARK_CONFIG.PATH;
         const date = new Date().toUTCString();
         
-        // 生成签名
         const algorithm = 'hmac-sha256';
         const headers = 'host date request-line';
         const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
         const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
-        // 生成 authorization 参数
         const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
-        
-        // 使用更安全的方式编码，避免Latin1字符限制
         const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
         
-        // 生成请求URL
-        const url = `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
-        
-        return url;
+        return `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
     }
     
     // 调用星火大模型API
     async function callSparkAPI(userMessage) {
         return new Promise((resolve, reject) => {
-            if (!apiKey) {
-                reject("请先设置API密钥");
-                return;
-            }
-            
-            // 检查API密钥是否已配置
-            if (!SPARK_CONFIG.API_SECRET || SPARK_CONFIG.API_SECRET === "您的API_SECRET" || 
-                !SPARK_CONFIG.APP_ID || SPARK_CONFIG.APP_ID === "您的APP_ID") {
-                reject("请先配置API_SECRET和APP_ID");
+            // 验证配置
+            const configError = validateAPIConfig();
+            if (configError) {
+                reject(configError);
                 return;
             }
             
@@ -174,8 +180,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const socket = new WebSocket(url);
                 
                 socket.onopen = () => {
-                    // 构建请求数据
                     const celebrityInfo = getCelebrityInfo(currentCelebrity);
+                    
+                    // X1-32K版本的请求格式
                     const requestData = {
                         header: {
                             app_id: SPARK_CONFIG.APP_ID,
@@ -183,70 +190,78 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         parameter: {
                             chat: {
-                                domain: "general",
-                                temperature: 0.5,
-                                max_tokens: 1024
+                                domain: SPARK_CONFIG.DOMAIN, // 使用generalv2域
+                                temperature: 0.7,
+                                max_tokens: 2048
                             }
                         },
                         payload: {
                             message: {
-                                text: [
-                                    {
-                                        role: "user",
-                                        content: `请你扮演${celebrityInfo.name}，${celebrityInfo.style}。请用这种风格回答以下问题：${userMessage}`
-                                    }
-                                ]
+                                text: [{
+                                    role: "user",
+                                    content: `请你扮演${celebrityInfo.name}，${celebrityInfo.style}。请用这种风格回答：${userMessage}`
+                                }]
                             }
                         }
                     };
                     
+                    console.log("发送请求:", requestData);
                     socket.send(JSON.stringify(requestData));
                 };
+                
+                let fullResponse = "";
                 
                 socket.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        console.log("API响应:", data);
+                        console.log("收到响应:", data);
                         
                         if (data.header.code !== 0) {
-                            reject(`API错误: ${data.header.message}`);
+                            reject(`API错误: ${data.header.message} (代码: ${data.header.code})`);
                             socket.close();
                             return;
                         }
                         
-                        // 确保有文本内容
-                        if (data.payload && data.payload.choices && data.payload.choices.text && data.payload.choices.text[0] && data.payload.choices.text[0].content) {
-                            const text = data.payload.choices.text[0].content;
-                            resolve(text);
-                        } else {
-                            reject("API响应格式不正确");
+                        // 累积响应内容
+                        if (data.payload?.choices?.text?.[0]?.content) {
+                            fullResponse += data.payload.choices.text[0].content;
                         }
                         
-                        // 如果状态为2，则表示所有数据接收完毕，可以关闭连接
+                        // 如果状态为2，则表示所有数据接收完毕
                         if (data.header.status === 2) {
+                            if (fullResponse) {
+                                resolve(fullResponse);
+                            } else {
+                                reject("API返回空响应");
+                            }
                             socket.close();
                         }
                     } catch (e) {
-                        reject(`解析API响应时出错: ${e.message}`);
+                        reject(`解析响应出错: ${e.message}`);
                     }
                 };
                 
                 socket.onerror = (error) => {
-                    // 更详细的错误信息
-                    console.error("WebSocket错误详情:", error);
-                    reject(`WebSocket连接错误: 请检查API密钥和网络连接`);
+                    console.error("WebSocket错误:", error);
+                    reject(`网络连接错误: 请检查网络设置和API配置`);
+                };
+                
+                socket.onclose = (event) => {
+                    if (event.code !== 1000 && !fullResponse) {
+                        reject(`连接关闭: ${event.code} - ${event.reason}`);
+                    }
                 };
                 
                 // 设置超时
                 setTimeout(() => {
                     if (socket.readyState !== WebSocket.CLOSED) {
-                        reject("API调用超时");
+                        reject("请求超时（15秒）");
                         socket.close();
                     }
-                }, 10000);
+                }, 15000);
                 
             } catch (error) {
-                reject(`调用API时出错: ${error.message}`);
+                reject(`调用API失败: ${error.message}`);
             }
         });
     }
@@ -254,10 +269,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 获取AI响应
     async function getAIResponse(userMessage) {
         try {
-            const response = await callSparkAPI(userMessage);
-            return response;
+            return await callSparkAPI(userMessage);
         } catch (error) {
-            console.error("API调用失败:", error);
+            console.error("API调用错误:", error);
             return `抱歉，调用API时出错: ${error}`;
         }
     }
@@ -270,38 +284,34 @@ document.addEventListener('DOMContentLoaded', function() {
         addMessage('user', message);
         userInput.value = '';
         
-        // 显示"正在输入"指示器
+        // 显示加载状态
         const typingIndicator = document.createElement('div');
-        typingIndicator.classList.add('message', 'ai-message');
         typingIndicator.id = 'typingIndicator';
         typingIndicator.innerHTML = `
-            <div class="message-header">
-                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%23ff7e5f'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23feb47b'/%3E%3C/svg%3E" class="avatar" alt="AI Avatar">
-                <span>${getCelebrityInfo(currentCelebrity).name}</span>
+            <div class="message ai-message">
+                <div class="message-header">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%23ff7e5f'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23feb47b'/%3E%3C/svg%3E" class="avatar">
+                    <span>${getCelebrityInfo(currentCelebrity).name}</span>
+                </div>
+                <div class="typing">正在思考中...</div>
             </div>
-            <div class="typing">正在输入...</div>
         `;
         chatMessages.appendChild(typingIndicator);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // 获取AI响应
-        const response = await getAIResponse(message);
-        
-        // 移除"正在输入"指示器
-        document.getElementById('typingIndicator')?.remove();
-        
-        // 添加AI响应
-        addMessage('ai', response);
+        try {
+            const response = await getAIResponse(message);
+            document.getElementById('typingIndicator')?.remove();
+            addMessage('ai', response);
+        } catch (error) {
+            document.getElementById('typingIndicator')?.remove();
+            addMessage('ai', `抱歉，发生错误: ${error}`);
+        }
     }
     
     // 事件监听器
     sendButton.addEventListener('click', sendMessage);
-    
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
+    userInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
     
     saveApiKeyButton.addEventListener('click', function() {
         const key = apiKeyInput.value.trim();
@@ -309,8 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
             apiKey = key;
             localStorage.setItem('celebrityChatApiKey', apiKey);
             apiKeyInput.value = '••••••••••••••••';
-            alert('API密钥已保存！');
-        } else if (apiKeyInput.value === '••••••••••••••••') {
             alert('API密钥已保存！');
         } else {
             alert('请输入有效的API密钥');
@@ -322,36 +330,26 @@ document.addEventListener('DOMContentLoaded', function() {
             conversationHistory = [];
             localStorage.removeItem(`celebrityChatHistory_${currentCelebrity}`);
             chatMessages.innerHTML = '';
-            addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity));
+            addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity), false);
         }
     });
     
     celebrityButtons.forEach(button => {
         button.addEventListener('click', function() {
-            celebrityButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            
-            // 保存当前对话历史
-            saveToStorage();
-            
-            // 切换明星
             currentCelebrity = this.dataset.celebrity;
             localStorage.setItem('currentCelebrity', currentCelebrity);
+            updateCelebrityButtons();
             
-            // 加载新明星的对话历史
             const savedHistory = localStorage.getItem(`celebrityChatHistory_${currentCelebrity}`);
             conversationHistory = savedHistory ? JSON.parse(savedHistory) : [];
             
-            // 渲染对话历史或添加欢迎消息
-            if (conversationHistory.length > 0) {
-                renderConversationHistory();
-            } else {
-                chatMessages.innerHTML = '';
-                addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity));
+            renderConversationHistory();
+            if (conversationHistory.length === 0) {
+                addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity), false);
             }
         });
     });
     
-    // 初始化加载
+    // 初始化
     loadFromStorage();
 });
