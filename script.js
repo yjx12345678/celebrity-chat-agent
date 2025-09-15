@@ -5,21 +5,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const apiKeyInput = document.getElementById('apiKeyInput');
     const saveApiKeyButton = document.getElementById('saveApiKey');
     const clearChatButton = document.getElementById('clearChat');
-    const toggleSimulationButton = document.getElementById('toggleSimulation');
-    const currentModeSpan = document.getElementById('currentMode');
     const celebrityButtons = document.querySelectorAll('.celebrity-btn');
     
     let currentCelebrity = 'jay';
     let apiKey = '';
     let conversationHistory = [];
-    let useSimulation = false; // 默认使用API模式
+    
+    // 星火大模型API配置 - 请替换为您的实际值
+    const SPARK_CONFIG = {
+        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw", // 替换为您的API_SECRET
+        APP_ID: "11fa6957", // 替换为您的APP_ID
+        HOST: "spark-api.xf-yun.com",
+        PATH: "/v1.1/chat"
+    };
     
     // 从localStorage加载数据
     function loadFromStorage() {
         const savedApiKey = localStorage.getItem('celebrityChatApiKey');
         const savedHistory = localStorage.getItem(`celebrityChatHistory_${currentCelebrity}`);
         const savedCelebrity = localStorage.getItem('currentCelebrity');
-        const savedUseSimulation = localStorage.getItem('useSimulation');
         
         if (savedApiKey) {
             apiKey = savedApiKey;
@@ -37,11 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        if (savedUseSimulation !== null) {
-            useSimulation = savedUseSimulation === 'true';
-            updateModeDisplay();
-        }
-        
         if (savedHistory) {
             conversationHistory = JSON.parse(savedHistory);
             renderConversationHistory();
@@ -49,12 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // 添加初始欢迎消息
             addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity));
         }
-    }
-    
-    // 更新模式显示
-    function updateModeDisplay() {
-        currentModeSpan.textContent = useSimulation ? "模拟对话模式" : "星火API模式";
-        toggleSimulationButton.textContent = useSimulation ? "使用真实API" : "使用模拟对话";
     }
     
     // 渲染对话历史
@@ -70,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('celebrityChatApiKey', apiKey);
         localStorage.setItem(`celebrityChatHistory_${currentCelebrity}`, JSON.stringify(conversationHistory));
         localStorage.setItem('currentCelebrity', currentCelebrity);
-        localStorage.setItem('useSimulation', useSimulation);
     }
     
     // 获取明星欢迎消息
@@ -139,8 +131,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 生成WebSocket所需的鉴权参数
     function getAuthParams(apiKey, apiSecret) {
-        const host = 'spark-api.xf-yun.com';
-        const path = '/v1.1/chat';
+        const host = SPARK_CONFIG.HOST;
+        const path = SPARK_CONFIG.PATH;
         const date = new Date().toUTCString();
         
         // 生成签名
@@ -150,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
-        // 生成 authorization 参数 - 修复编码问题
+        // 生成 authorization 参数
         const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
         
         // 使用更安全的方式编码，避免Latin1字符限制
@@ -170,19 +162,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // 这里应该是实际的API密钥和密钥，您需要从星火平台获取
-            const API_KEY = apiKey;
-            const API_SECRET = "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw"; // 需要从星火平台获取
-            const APP_ID = "11fa6957"; // 需要从星火平台获取
-            
             // 检查API密钥是否已配置
-            if (!API_SECRET || API_SECRET === "您的API_SECRET" || !APP_ID || APP_ID === "您的APP_ID") {
+            if (!SPARK_CONFIG.API_SECRET || SPARK_CONFIG.API_SECRET === "您的API_SECRET" || 
+                !SPARK_CONFIG.APP_ID || SPARK_CONFIG.APP_ID === "您的APP_ID") {
                 reject("请先配置API_SECRET和APP_ID");
                 return;
             }
             
             try {
-                const url = getAuthParams(API_KEY, API_SECRET);
+                const url = getAuthParams(apiKey, SPARK_CONFIG.API_SECRET);
                 const socket = new WebSocket(url);
                 
                 socket.onopen = () => {
@@ -190,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const celebrityInfo = getCelebrityInfo(currentCelebrity);
                     const requestData = {
                         header: {
-                            app_id: APP_ID,
+                            app_id: SPARK_CONFIG.APP_ID,
                             uid: "user123"
                         },
                         parameter: {
@@ -263,68 +251,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 模拟AI响应
-    function simulateAIResponse(userMessage) {
-        const lowerCaseMessage = userMessage.toLowerCase();
-        const celebrity = getCelebrityInfo(currentCelebrity);
-        
-        if (currentCelebrity === 'jay') {
-            if (lowerCaseMessage.includes('音乐') || lowerCaseMessage.includes('歌')) {
-                return "哎呦不错哦！我的新歌正在筹备中，依然是中国风混搭流行元素，敬请期待！🎵";
-            } else if (lowerCaseMessage.includes('电影')) {
-                return "电影啊...我最近在忙音乐，不过如果有好的剧本，我也会考虑重返大银幕哦！🎬";
-            } else if (lowerCaseMessage.includes('家庭') || lowerCaseMessage.includes('孩子')) {
-                return "家庭对我来说很重要，昆凌和孩子们是我最大的动力！😊";
-            } else {
-                return "嘿，这个话题很有趣！不过我还是想聊聊音乐，你知道我最近在听什么吗？";
-            }
-        } else if (currentCelebrity === 'taylor') {
-            if (lowerCaseMessage.includes('music') || lowerCaseMessage.includes('song')) {
-                return "I'm always writing new songs! My latest album is all about storytelling and emotions. 🎵";
-            } else if (lowerCaseMessage.includes('cat') || lowerCaseMessage.includes('kitten')) {
-                return "Oh I love my cats! Meredith and Olivia are the cutest! 🐱";
-            } else {
-                return "That's an interesting topic! But you know what I'd really love to talk about? My latest project!";
-            }
-        } else if (currentCelebrity === 'jackie') {
-            if (lowerCaseMessage.includes('电影') || lowerCaseMessage.includes('拍摄')) {
-                return "拍动作片真的很辛苦，但我坚持不用替身！最近我在筹备一部新电影，会有很多创新的特技！🎬";
-            } else if (lowerCaseMessage.includes('慈善')) {
-                return "我相信回馈社会非常重要，我的慈善基金会一直在帮助需要帮助的人们！❤️";
-            } else {
-                return "谢谢你的关注！我最近在忙很多项目，不只是电影，还有慈善工作！";
-            }
-        } else if (currentCelebrity === 'kris') {
-            if (lowerCaseMessage.includes('音乐') || lowerCaseMessage.includes('rap')) {
-                return "Yo! 我的新专辑正在制作中，会有很多新的尝试，hip-hop加上中国元素，超swag的！🎤";
-            } else if (lowerCaseMessage.includes('篮球')) {
-                return "篮球是我的 passion! 我经常参加慈善篮球赛，你有看过我打球吗？🏀";
-            } else {
-                return "挺有意思的话题！不过我还是想聊聊我的新歌，你想听吗？";
-            }
-        }
-        
-        return "谢谢你的消息！我很高兴能和你聊天。有什么特别想聊的话题吗？";
-    }
-    
     // 获取AI响应
     async function getAIResponse(userMessage) {
-        if (useSimulation) {
-            // 使用模拟响应
-            return simulateAIResponse(userMessage);
-        } else {
-            // 使用星火API
-            try {
-                const response = await callSparkAPI(userMessage);
-                return response;
-            } catch (error) {
-                console.error("API调用失败:", error);
-                // 自动切换到模拟模式
-                useSimulation = true;
-                localStorage.setItem('useSimulation', true);
-                updateModeDisplay();
-                return `抱歉，调用API时出错: ${error}。已自动切换到模拟模式。`;
-            }
+        try {
+            const response = await callSparkAPI(userMessage);
+            return response;
+        } catch (error) {
+            console.error("API调用失败:", error);
+            return `抱歉，调用API时出错: ${error}`;
         }
     }
     
@@ -390,13 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
             chatMessages.innerHTML = '';
             addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity));
         }
-    });
-    
-    toggleSimulationButton.addEventListener('click', function() {
-        useSimulation = !useSimulation;
-        localStorage.setItem('useSimulation', useSimulation);
-        updateModeDisplay();
-        alert(`已切换到${useSimulation ? '模拟对话模式' : '星火API模式'}`);
     });
     
     celebrityButtons.forEach(button => {
