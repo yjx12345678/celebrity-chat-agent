@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         APP_ID: "11fa6957", // 您的APPID
         HOST: "spark-api.xf-yun.com",
         PATH: "/v1/x1", // X1-32K版本的接口路径
-        DOMAIN: "generalv2" // X1-32K版本使用generalv2域
+        DOMAIN: "x1" // 修正为正确的domain值
     };
     
     // 从localStorage加载数据
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         parameter: {
                             chat: {
-                                domain: SPARK_CONFIG.DOMAIN, // 使用generalv2域
+                                domain: SPARK_CONFIG.DOMAIN, // 使用正确的domain值
                                 temperature: 0.7,
                                 max_tokens: 2048
                             }
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     };
                     
-                    console.log("发送请求:", requestData);
+                    console.log("发送请求:", JSON.stringify(requestData, null, 2));
                     socket.send(JSON.stringify(requestData));
                 };
                 
@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
             chatMessages.innerHTML = '';
             addMessage('ai', getCelebrityWelcomeMessage(currentCelebrity), false);
         }
-    });
+    };
     
     celebrityButtons.forEach(button => {
         button.addEventListener('click', function() {
