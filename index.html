@@ -38,15 +38,13 @@
     </div>
     
     <div class="api-key-container">
-        <input type="password" class="api-key-input" id="apiKeyInput" placeholder="输入星火大模型API密钥（可选，使用模拟对话可不填）">
+        <input type="password" class="api-key-input" id="apiKeyInput" placeholder="输入星火大模型API密钥">
         <button id="saveApiKey">保存密钥</button>
         <button id="clearChat">清空对话</button>
-        <button id="toggleSimulation">切换模拟模式</button>
     </div>
     
     <div class="info">
         <p>注意：使用真实API需要您提供自己的星火大模型API密钥，密钥仅存储在您的浏览器中。</p>
-        <p>当前模式: <span id="currentMode">模拟对话模式</span></p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
