@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentCelebrity = 'jay';
     let apiKey = '';
     let conversationHistory = [];
-    let useSimulation = true; // 默认使用模拟模式
+    let useSimulation = false; // 默认使用API模式
     
     // 从localStorage加载数据
     function loadFromStorage() {
@@ -150,9 +150,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
-        // 生成 authorization 参数
+        // 生成 authorization 参数 - 修复编码问题
         const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
-        const authorization = btoa(authorizationOrigin);
+        
+        // 使用更安全的方式编码，避免Latin1字符限制
+        const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
         
         // 生成请求URL
         const url = `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
@@ -169,9 +171,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // 这里应该是实际的API密钥和密钥，您需要从星火平台获取
-            // 注意：实际应用中应该使用后端来保护这些密钥
-            const API_KEY = f57667d9f972963adacc2bc7a506f55f;
+            const API_KEY = apiKey;
             const API_SECRET = "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw"; // 需要从星火平台获取
+            const APP_ID = "11fa6957"; // 需要从星火平台获取
+            
+            // 检查API密钥是否已配置
+            if (!API_SECRET || API_SECRET === "您的API_SECRET" || !APP_ID || APP_ID === "您的APP_ID") {
+                reject("请先配置API_SECRET和APP_ID");
+                return;
+            }
             
             try {
                 const url = getAuthParams(API_KEY, API_SECRET);
@@ -182,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const celebrityInfo = getCelebrityInfo(currentCelebrity);
                     const requestData = {
                         header: {
-                            app_id: "11fa6957", // 需要从星火平台获取
+                            app_id: APP_ID,
                             uid: "user123"
                         },
                         parameter: {
@@ -208,26 +216,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 
                 socket.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data.header.code !== 0) {
-                        reject(`API错误: ${data.header.message}`);
-                        socket.close();
-                        return;
-                    }
-                    
-                    const text = data.payload.choices.text[0].content;
-                    resolve(text);
-                    
-                    // 如果状态为2，则表示所有数据接收完毕，可以关闭连接
-                    if (data.header.status === 2) {
-                        socket.close();
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log("API响应:", data);
+                        
+                        if (data.header.code !== 0) {
+                            reject(`API错误: ${data.header.message}`);
+                            socket.close();
+                            return;
+                        }
+                        
+                        // 确保有文本内容
+                        if (data.payload && data.payload.choices && data.payload.choices.text && data.payload.choices.text[0] && data.payload.choices.text[0].content) {
+                            const text = data.payload.choices.text[0].content;
+                            resolve(text);
+                        } else {
+                            reject("API响应格式不正确");
+                        }
+                        
+                        // 如果状态为2，则表示所有数据接收完毕，可以关闭连接
+                        if (data.header.status === 2) {
+                            socket.close();
+                        }
+                    } catch (e) {
+                        reject(`解析API响应时出错: ${e.message}`);
                     }
                 };
                 
                 socket.onerror = (error) => {
-                    reject(`WebSocket错误: ${error}`);
-                    socket.close();
+                    // 更详细的错误信息
+                    console.error("WebSocket错误详情:", error);
+                    reject(`WebSocket连接错误: 请检查API密钥和网络连接`);
                 };
+                
+                // 设置超时
+                setTimeout(() => {
+                    if (socket.readyState !== WebSocket.CLOSED) {
+                        reject("API调用超时");
+                        socket.close();
+                    }
+                }, 10000);
                 
             } catch (error) {
                 reject(`调用API时出错: ${error.message}`);
@@ -291,6 +319,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response;
             } catch (error) {
                 console.error("API调用失败:", error);
+                // 自动切换到模拟模式
+                useSimulation = true;
+                localStorage.setItem('useSimulation', true);
+                updateModeDisplay();
                 return `抱歉，调用API时出错: ${error}。已自动切换到模拟模式。`;
             }
         }
