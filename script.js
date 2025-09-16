@@ -11,11 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let apiKey = '';
     let conversationHistory = [];
     
-    // 星火大模型HTTP API配置
+    // 星火大模型配置（这些是固定的，不需要用户输入）
     const SPARK_CONFIG = {
         API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw",
         APP_ID: "11fa6957",
-        API_URL: "https://spark-api-open.xf-yun.com/v2/chat/completions" // 使用HTTP接口
+        API_URL: "https://spark-api-open.xf-yun.com/v2/chat/completions"
     };
     
     // 从localStorage加载数据
@@ -27,6 +27,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (savedApiKey) {
             apiKey = savedApiKey;
             apiKeyInput.value = '••••••••••••••••';
+        } else {
+            // 如果没有保存的API密钥，使用默认的（仅用于演示）
+            apiKey = "157667d9f972963adacc2bc7a506f55f";
+            apiKeyInput.placeholder = "使用默认API密钥（可输入自己的）";
         }
         
         if (savedCelebrity) {
@@ -110,15 +114,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 生成鉴权头
     function generateAuthHeader() {
-        const apiKey = "157667d9f972963adacc2bc7a506f55f"; // 您的APIKey
-        const apiSecret = SPARK_CONFIG.API_SECRET;
         const host = "spark-api-open.xf-yun.com";
         const date = new Date().toUTCString();
         const algorithm = 'hmac-sha256';
         const headers = 'host date request-line';
         
         const signatureOrigin = `host: ${host}\ndate: ${date}\nPOST /v2/chat/completions HTTP/1.1`;
-        const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
+        const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, SPARK_CONFIG.API_SECRET);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
         const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
@@ -160,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
             
-            console.log("发送请求:", JSON.stringify(requestData, null, 2));
+            console.log("发送请求到星火API...");
             
             const response = await fetch(SPARK_CONFIG.API_URL, {
                 method: 'POST',
@@ -230,12 +232,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 事件监听
+    // 事件监听 - 修复保存功能
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
     
     saveApiKeyButton.addEventListener('click', () => {
-        alert('API密钥已内置配置中');
+        const key = apiKeyInput.value.trim();
+        if (key && key !== '••••••••••••••••') {
+            apiKey = key;
+            localStorage.setItem('celebrityChatApiKey', apiKey);
+            apiKeyInput.value = '••••••••••••••••';
+            alert('API密钥已保存！将在下次对话时使用。');
+        } else {
+            // 使用默认密钥
+            apiKey = "157667d9f972963adacc2bc7a506f55f";
+            alert('已使用默认API密钥');
+        }
     });
     
     clearChatButton.addEventListener('click', () => {
