@@ -1,0 +1,12 @@
+[build]
+  publish = "."
+  command = "npm install"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["crypto-js"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
