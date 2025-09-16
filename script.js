@@ -7,6 +7,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let currentCelebrity = 'jay';
     let conversationHistory = [];
+    let currentWebSocket = null;
+    
+    // WebSocket API配置
+    const SPARK_CONFIG = {
+        API_KEY: "157667d9f972963adacc2bc7a506f55f",
+        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw",
+        APP_ID: "11fa6957",
+        API_URL: "wss://spark-api.xf-yun.com/v1/x1"
+    };
     
     // 从localStorage加载数据
     function loadFromStorage() {
@@ -91,150 +100,149 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // 智能响应生成器（完全前端，无需API）
-    function generateAIResponse(userMessage) {
-        const celebrityInfo = getCelebrityInfo(currentCelebrity);
-        const lowerMessage = userMessage.toLowerCase();
+    // 生成WebSocket认证URL - 修复版
+    function generateWebSocketURL() {
+        const host = "spark-api.xf-yun.com";
+        const path = "/v1/x1";
+        const date = new Date().toUTCString();
         
-        // 各明星的响应库
-        const responseTemplates = {
-            jay: {
-                greetings: ["哎呦不错哦～", "哼哼哈兮！", "哎哟，", "朋友，"],
-                topics: {
-                    music: [
-                        "想听《双截棍》还是《晴天》？我都可以唱给你听！",
-                        "音乐是我的生命，每首歌都有它的故事。",
-                        "最近在写新歌，要不要给你透露一点点？"
-                    ],
-                    movie: [
-                        "《不能说的秘密》是我最满意的电影作品！",
-                        "拍电影和做音乐一样，都需要用心。",
-                        "你想聊哪部我的电影？"
-                    ],
-                    life: [
-                        "奶茶是我的最爱，一天不喝浑身难受！",
-                        "家庭对我来说是最重要的。",
-                        "喜欢魔术吗？我最近学了不少新 tricks！"
-                    ],
-                    default: [
-                        "今天心情不错，想聊点什么？",
-                        "哎呦，这个话题有意思！",
-                        "你怎么知道我对这个感兴趣？"
-                    ]
-                }
-            },
-            taylor: {
-                greetings: ["Hi! ", "Hey there! ", "Oh my gosh! ", "You guys! "],
-                topics: {
-                    music: [
-                        "I'm working on new music right now! So excited!",
-                        "Which album is your favorite? Mine is always the latest one!",
-                        "Writing songs is how I process my feelings."
-                    ],
-                    cats: [
-                        "My cats Meredith and Olivia say meow! 🐱",
-                        "Did you know Olivia has her own Instagram?",
-                        "Cats are better than people, don't you think?"
-                    ],
-                    life: [
-                        "I believe in being kind to everyone.",
-                        "Life is about learning and growing.",
-                        "What's your favorite thing about today?"
-                    ],
-                    default: [
-                        "That's so interesting! Tell me more!",
-                        "I love talking about this!",
-                        "You're making me think about things differently!"
-                    ]
-                }
-            },
-            jackie: {
-                greetings: ["大家好！", "朋友们！", "喂！", "哈喽！"],
-                topics: {
-                    movie: [
-                        "我拍电影从不用替身，这是我对观众的尊重！",
-                        "动作戏虽然危险，但看到观众喜欢就值得了。",
-                        "你想学功夫吗？我可以教你两招！"
-                    ],
-                    charity: [
-                        "慈善是我一生的事业，帮助别人让我快乐。",
-                        "每个人都可以为社会做点贡献。",
-                        "看到需要帮助的人露出笑容，是最幸福的事。"
-                    ],
-                    life: [
-                        "年龄不是问题，心态年轻最重要！",
-                        "我每天坚持锻炼，身体是革命的本钱。",
-                        "家庭和事业都要兼顾，这才是完整的人生。"
-                    ],
-                    default: [
-                        "这个问题问得好！",
-                        "让我想想怎么回答你...",
-                        "很有意思的话题！"
-                    ]
-                }
-            },
-            kris: [
-                "Yo! 你想聊音乐还是时尚？",
-                "篮球是我的 passion，音乐是我的 soul！",
-                "做自己，就是最酷的时尚态度！",
-                "你看这个面它又长又宽～",
-                "保持真实，保持酷！",
-                "音乐没有界限，时尚没有规则！"
-            ]
-        };
+        // 生成签名
+        const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+        const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, SPARK_CONFIG.API_SECRET);
+        const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
-        // 生成响应
-        return new Promise((resolve) => {
-            // 模拟思考时间
-            const thinkTime = 800 + Math.random() * 1200;
+        // 生成授权参数 - 使用btoa代替Buffer
+        const authorizationOrigin = `api_key="${SPARK_CONFIG.API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+        const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
+        
+        // 返回WebSocket URL
+        return `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
+    }
+    
+    // 调用星火WebSocket API
+    async function callSparkAPI(userMessage) {
+        return new Promise((resolve, reject) => {
+            const wsUrl = generateWebSocketURL();
+            console.log("WebSocket URL:", wsUrl);
             
-            setTimeout(() => {
-                let response;
+            const ws = new WebSocket(wsUrl);
+            currentWebSocket = ws;
+            
+            let fullResponse = "";
+            let responseReceived = false;
+            
+            const celebrityInfo = getCelebrityInfo(currentCelebrity);
+            
+            ws.onopen = () => {
+                console.log("WebSocket连接已建立");
                 
-                if (currentCelebrity === 'kris') {
-                    // 吴亦凡的简单响应
-                    const responses = responseTemplates.kris;
-                    response = responses[Math.floor(Math.random() * responses.length)];
-                } else {
-                    // 其他明星的智能响应
-                    const template = responseTemplates[currentCelebrity];
-                    const greeting = template.greetings[Math.floor(Math.random() * template.greetings.length)];
+                const requestData = {
+                    header: {
+                        app_id: SPARK_CONFIG.APP_ID,
+                        uid: "user123"
+                    },
+                    parameter: {
+                        chat: {
+                            domain: "general",
+                            temperature: 0.7,
+                            max_tokens: 2048
+                        }
+                    },
+                    payload: {
+                        message: {
+                            text: [
+                                {
+                                    role: "user",
+                                    content: `请你扮演${celebrityInfo.name}，使用${celebrityInfo.style}与用户对话。保持角色一致性，模仿该明星的说话方式和特点。用户说：${userMessage}`
+                                }
+                            ]
+                        }
+                    }
+                };
+                
+                console.log("发送请求:", JSON.stringify(requestData));
+                ws.send(JSON.stringify(requestData));
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("收到消息:", data);
                     
-                    let topic = 'default';
-                    if (lowerMessage.includes('音乐') || lowerMessage.includes('歌') || lowerMessage.includes('music') || lowerMessage.includes('song')) {
-                        topic = 'music';
-                    } else if (lowerMessage.includes('电影') || lowerMessage.includes('movie') || lowerMessage.includes('film')) {
-                        topic = 'movie';
-                    } else if (lowerMessage.includes('猫') || lowerMessage.includes('cat')) {
-                        topic = 'cats';
-                    } else if (lowerMessage.includes('慈善') || lowerMessage.includes('charity')) {
-                        topic = 'charity';
-                    } else if (lowerMessage.includes('生活') || lowerMessage.includes('life')) {
-                        topic = 'life';
+                    if (data.payload && data.payload.choices && data.payload.choices.text) {
+                        data.payload.choices.text.forEach(text => {
+                            if (text.content && text.content !== "null") {
+                                fullResponse += text.content;
+                            }
+                        });
                     }
                     
-                    const topicResponses = template.topics[topic] || template.topics.default;
-                    const topicResponse = topicResponses[Math.floor(Math.random() * topicResponses.length)];
-                    
-                    response = greeting + topicResponse;
+                    // 检查会话是否结束
+                    if (data.header && data.header.status === 2) {
+                        responseReceived = true;
+                        ws.close();
+                        if (fullResponse) {
+                            resolve(fullResponse);
+                        } else {
+                            resolve("抱歉，我没有理解您的意思，可以再说一次吗？");
+                        }
+                    }
+                } catch (error) {
+                    console.error("解析消息错误:", error);
                 }
-                
-                resolve(response);
-            }, thinkTime);
+            };
+            
+            ws.onerror = (error) => {
+                console.error("WebSocket错误:", error);
+                reject(new Error("网络连接失败，请检查网络设置"));
+            };
+            
+            ws.onclose = (event) => {
+                currentWebSocket = null;
+                if (!responseReceived && !fullResponse) {
+                    reject(new Error("连接已关闭，未收到完整响应"));
+                }
+            };
+            
+            // 设置超时
+            setTimeout(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                }
+                if (!responseReceived) {
+                    reject(new Error("请求超时，请重试"));
+                }
+            }, 30000); // 30秒超时
         });
     }
     
     async function getAIResponse(userMessage) {
         try {
-            return await generateAIResponse(userMessage);
+            return await callSparkAPI(userMessage);
         } catch (error) {
-            return "让我想想该怎么回答你...";
+            console.error("API调用失败:", error);
+            
+            if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+                return "网络连接失败，请检查您的网络设置后重试。";
+            } else if (error.message.includes('timeout')) {
+                return "请求超时，可能是网络较慢，请稍后重试。";
+            } else if (error.message.includes('Unauthorized')) {
+                return "API认证失败，请检查API密钥配置。";
+            } else {
+                return `抱歉，暂时无法处理您的请求: ${error.message}`;
+            }
         }
     }
     
     async function sendMessage() {
         const message = userInput.value.trim();
         if (!message) return;
+        
+        // 关闭之前的连接（如果有）
+        if (currentWebSocket) {
+            currentWebSocket.close();
+            currentWebSocket = null;
+        }
         
         addMessage('user', message);
         userInput.value = '';
@@ -259,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('ai', response);
         } catch (error) {
             document.getElementById('typingIndicator')?.remove();
-            addMessage('ai', "让我想想该怎么回答你...");
+            addMessage('ai', `错误: ${error.message}`);
         }
     }
     
