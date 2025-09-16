@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // 生成WebSocket认证URL
+    // 生成WebSocket认证URL - 修复版
     function generateWebSocketURL() {
         const host = "spark-api.xf-yun.com";
         const path = "/v1/x1";
@@ -111,9 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, SPARK_CONFIG.API_SECRET);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
-        // 生成授权参数
+        // 生成授权参数 - 使用btoa代替Buffer
         const authorizationOrigin = `api_key="${SPARK_CONFIG.API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
-        const authorization = Buffer.from(authorizationOrigin).toString('base64');
+        const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
         
         // 返回WebSocket URL
         return `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
@@ -123,6 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
     async function callSparkAPI(userMessage) {
         return new Promise((resolve, reject) => {
             const wsUrl = generateWebSocketURL();
+            console.log("WebSocket URL:", wsUrl);
+            
             const ws = new WebSocket(wsUrl);
             currentWebSocket = ws;
             
