@@ -1,7 +1,7 @@
-const CryptoJS = require('crypto-js');
+// 使用ES模块语法，Netlify支持
+import CryptoJS from 'crypto-js';
 
-exports.handler = async function(event, context) {
-    // 只允许POST请求
+export const handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -20,7 +20,6 @@ exports.handler = async function(event, context) {
             };
         }
         
-        // 从环境变量获取API配置
         const API_KEY = process.env.SPARK_API_KEY;
         const API_SECRET = process.env.SPARK_API_SECRET;
         const APP_ID = process.env.SPARK_APP_ID || "11fa6957";
@@ -33,7 +32,6 @@ exports.handler = async function(event, context) {
             };
         }
         
-        // 获取明星信息
         function getCelebrityInfo(celeb) {
             const celebrities = {
                 jay: { name: "周杰伦AI", style: "周杰伦风格" },
@@ -46,7 +44,6 @@ exports.handler = async function(event, context) {
         
         const celebrityInfo = getCelebrityInfo(celebrity);
         
-        // 生成鉴权头
         function generateAuthHeader(apiKey, apiSecret) {
             const host = "spark-api-open.xf-yun.com";
             const date = new Date().toUTCString();
@@ -70,7 +67,6 @@ exports.handler = async function(event, context) {
         
         const authHeaders = generateAuthHeader(API_KEY, API_SECRET);
         
-        // 构建对话历史
         const messageHistory = [
             {
                 role: "user",
@@ -102,7 +98,6 @@ exports.handler = async function(event, context) {
             }
         };
         
-        // 调用星火API
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: authHeaders,
