@@ -2,32 +2,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chatMessages');
     const userInput = document.getElementById('userInput');
     const sendButton = document.getElementById('sendButton');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const saveApiKeyButton = document.getElementById('saveApiKey');
     const clearChatButton = document.getElementById('clearChat');
     const celebrityButtons = document.querySelectorAll('.celebrity-btn');
     
     let currentCelebrity = 'jay';
-    let apiKey = '';
     let conversationHistory = [];
-    
-    // 星火大模型HTTP API配置
-    const SPARK_CONFIG = {
-        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw",
-        APP_ID: "11fa6957",
-        API_URL: "https://spark-api-open.xf-yun.com/v2/chat/completions" // 使用HTTP接口
-    };
     
     // 从localStorage加载数据
     function loadFromStorage() {
-        const savedApiKey = localStorage.getItem('celebrityChatApiKey');
         const savedHistory = localStorage.getItem(`celebrityChatHistory_${currentCelebrity}`);
         const savedCelebrity = localStorage.getItem('currentCelebrity');
-        
-        if (savedApiKey) {
-            apiKey = savedApiKey;
-            apiKeyInput.value = '••••••••••••••••';
-        }
         
         if (savedCelebrity) {
             currentCelebrity = savedCelebrity;
@@ -56,7 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function saveToStorage() {
-        localStorage.setItem('celebrityChatApiKey', apiKey);
         localStorage.setItem(`celebrityChatHistory_${currentCelebrity}`, JSON.stringify(conversationHistory));
         localStorage.setItem('currentCelebrity', currentCelebrity);
     }
@@ -89,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         messageDiv.innerHTML = `
             <div class="message-header">
-                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%23${sender === 'user' ? '66a6ff' : 'ff7e5f'}'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23${sender === 'user' ? '89f7fe' : 'feb47b'}'/%3E%3C/svg%3E" class="avatar">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%23${sender === 'user' ? '43cea2' : '6e8efb'}'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23${sender === 'user' ? '185a9d' : 'a777e3'}'/%3E%3C/svg%3E" class="avatar">
                 <span>${sender === 'user' ? '你' : celebrityInfo.name}</span>
             </div>
             ${text}
@@ -108,82 +91,30 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // 生成鉴权头
-    function generateAuthHeader() {
-        const apiKey = "157667d9f972963adacc2bc7a506f55f"; // 您的APIKey
-        const apiSecret = SPARK_CONFIG.API_SECRET;
-        const host = "spark-api-open.xf-yun.com";
-        const date = new Date().toUTCString();
-        const algorithm = 'hmac-sha256';
-        const headers = 'host date request-line';
-        
-        const signatureOrigin = `host: ${host}\ndate: ${date}\nPOST /v2/chat/completions HTTP/1.1`;
-        const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
-        const signature = CryptoJS.enc.Base64.stringify(signatureSha);
-        
-        const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
-        const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
-        
-        return {
-            'Authorization': authorization,
-            'Content-Type': 'application/json',
-            'Host': host,
-            'Date': date
-        };
-    }
-    
-    // 调用星火大模型HTTP API
+    // 调用Netlify Function
     async function callSparkAPI(userMessage) {
         try {
-            const authHeaders = generateAuthHeader();
             const celebrityInfo = getCelebrityInfo(currentCelebrity);
             
-            const requestData = {
-                header: {
-                    app_id: SPARK_CONFIG.APP_ID,
-                    uid: "user123"
-                },
-                parameter: {
-                    chat: {
-                        domain: "generalv2",
-                        temperature: 0.5,
-                        max_tokens: 2048
-                    }
-                },
-                payload: {
-                    message: {
-                        text: [{
-                            role: "user",
-                            content: `请你扮演${celebrityInfo.name}，${celebrityInfo.style}。请用这种风格回答：${userMessage}`
-                        }]
-                    }
-                }
-            };
-            
-            console.log("发送请求:", JSON.stringify(requestData, null, 2));
-            
-            const response = await fetch(SPARK_CONFIG.API_URL, {
+            const response = await fetch('/.netlify/functions/spark-chat', {
                 method: 'POST',
-                headers: authHeaders,
-                body: JSON.stringify(requestData)
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    celebrity: currentCelebrity,
+                    history: conversationHistory.slice(-6) // 发送最近6条消息作为上下文
+                })
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status} ${response.statusText}`);
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP错误: ${response.status}`);
             }
             
             const data = await response.json();
-            console.log("API响应:", data);
-            
-            if (data.header.code !== 0) {
-                throw new Error(`API错误: ${data.header.message} (代码: ${data.header.code})`);
-            }
-            
-            if (data.payload?.choices?.text?.[0]?.content) {
-                return data.payload.choices.text[0].content;
-            } else {
-                throw new Error("API返回空响应");
-            }
+            return data.response;
             
         } catch (error) {
             console.error("API调用失败:", error);
@@ -211,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         typingIndicator.innerHTML = `
             <div class="message ai-message">
                 <div class="message-header">
-                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%23ff7e5f'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23feb47b'/%3E%3C/svg%3E" class="avatar">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='30' fill='%236e8efb'/%3E%3Ccircle cx='50' cy='100' r='45' fill='%23a777e3'/%3E%3C/svg%3E" class="avatar">
                     <span>${getCelebrityInfo(currentCelebrity).name}</span>
                 </div>
                 <div class="typing">正在思考中...</div>
@@ -233,10 +164,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 事件监听
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
-    
-    saveApiKeyButton.addEventListener('click', () => {
-        alert('API密钥已内置配置中');
-    });
     
     clearChatButton.addEventListener('click', () => {
         if (confirm('清空对话历史？')) {
