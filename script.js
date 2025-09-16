@@ -11,12 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let apiKey = '';
     let conversationHistory = [];
     
-    // 星火大模型API配置
+    // 星火大模型HTTP API配置
     const SPARK_CONFIG = {
         API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw",
         APP_ID: "11fa6957",
-        HOST: "spark-api.xf-yun.com",
-        PATH: "/v1/x1"
+        API_URL: "https://spark-api-open.xf-yun.com/v2/chat/completions" // 使用HTTP接口
     };
     
     // 从localStorage加载数据
@@ -109,120 +108,94 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    function validateAPIConfig() {
-        if (!apiKey) return "请先设置API密钥";
-        if (!SPARK_CONFIG.API_SECRET) return "请配置API_SECRET";
-        if (!SPARK_CONFIG.APP_ID) return "请配置APP_ID";
-        return null;
-    }
-    
-    function getAuthParams(apiKey, apiSecret) {
-        const host = SPARK_CONFIG.HOST;
-        const path = SPARK_CONFIG.PATH;
+    // 生成鉴权头
+    function generateAuthHeader() {
+        const apiKey = "157667d9f972963adacc2bc7a506f55f"; // 您的APIKey
+        const apiSecret = SPARK_CONFIG.API_SECRET;
+        const host = "spark-api-open.xf-yun.com";
         const date = new Date().toUTCString();
-        
         const algorithm = 'hmac-sha256';
         const headers = 'host date request-line';
-        const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+        
+        const signatureOrigin = `host: ${host}\ndate: ${date}\nPOST /v2/chat/completions HTTP/1.1`;
         const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
         const signature = CryptoJS.enc.Base64.stringify(signatureSha);
         
         const authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
         const authorization = btoa(unescape(encodeURIComponent(authorizationOrigin)));
         
-        return `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
+        return {
+            'Authorization': authorization,
+            'Content-Type': 'application/json',
+            'Host': host,
+            'Date': date
+        };
     }
     
+    // 调用星火大模型HTTP API
     async function callSparkAPI(userMessage) {
-        return new Promise((resolve, reject) => {
-            const configError = validateAPIConfig();
-            if (configError) return reject(configError);
+        try {
+            const authHeaders = generateAuthHeader();
+            const celebrityInfo = getCelebrityInfo(currentCelebrity);
             
-            try {
-                const url = getAuthParams(apiKey, SPARK_CONFIG.API_SECRET);
-                const socket = new WebSocket(url);
-                
-                socket.onopen = () => {
-                    const celebrityInfo = getCelebrityInfo(currentCelebrity);
-                    
-                    // 使用星火API官方文档推荐的请求格式
-                    const requestData = {
-                        header: {
-                            app_id: SPARK_CONFIG.APP_ID,
-                            uid: "user123"
-                        },
-                        parameter: {
-                            chat: {
-                                domain: "x1", // 直接使用字符串，不要用变量
-                                temperature: 0.5,
-                                max_tokens: 2048,
-                                top_k: 4,
-                                chat_id: "chat001"
-                            }
-                        },
-                        payload: {
-                            message: {
-                                text: [{
-                                    role: "user",
-                                    content: `请你扮演${celebrityInfo.name}，${celebrityInfo.style}。请用这种风格回答：${userMessage}`
-                                }]
-                            }
-                        }
-                    };
-                    
-                    console.log("发送请求:", JSON.stringify(requestData, null, 2));
-                    socket.send(JSON.stringify(requestData));
-                };
-                
-                let fullResponse = "";
-                
-                socket.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        console.log("API响应:", data);
-                        
-                        if (data.header.code !== 0) {
-                            reject(`API错误: ${data.header.message} (代码: ${data.header.code})`);
-                            socket.close();
-                            return;
-                        }
-                        
-                        if (data.payload?.choices?.text?.[0]?.content) {
-                            fullResponse += data.payload.choices.text[0].content;
-                        }
-                        
-                        if (data.header.status === 2) {
-                            fullResponse ? resolve(fullResponse) : reject("空响应");
-                            socket.close();
-                        }
-                    } catch (e) {
-                        reject(`解析错误: ${e.message}`);
+            const requestData = {
+                header: {
+                    app_id: SPARK_CONFIG.APP_ID,
+                    uid: "user123"
+                },
+                parameter: {
+                    chat: {
+                        domain: "generalv2",
+                        temperature: 0.5,
+                        max_tokens: 2048
                     }
-                };
-                
-                socket.onerror = (error) => {
-                    reject(`网络错误: ${error}`);
-                };
-                
-                setTimeout(() => {
-                    if (socket.readyState !== WebSocket.CLOSED) {
-                        reject("请求超时");
-                        socket.close();
+                },
+                payload: {
+                    message: {
+                        text: [{
+                            role: "user",
+                            content: `请你扮演${celebrityInfo.name}，${celebrityInfo.style}。请用这种风格回答：${userMessage}`
+                        }]
                     }
-                }, 10000);
-                
-            } catch (error) {
-                reject(`调用失败: ${error.message}`);
+                }
+            };
+            
+            console.log("发送请求:", JSON.stringify(requestData, null, 2));
+            
+            const response = await fetch(SPARK_CONFIG.API_URL, {
+                method: 'POST',
+                headers: authHeaders,
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP错误: ${response.status} ${response.statusText}`);
             }
-        });
+            
+            const data = await response.json();
+            console.log("API响应:", data);
+            
+            if (data.header.code !== 0) {
+                throw new Error(`API错误: ${data.header.message} (代码: ${data.header.code})`);
+            }
+            
+            if (data.payload?.choices?.text?.[0]?.content) {
+                return data.payload.choices.text[0].content;
+            } else {
+                throw new Error("API返回空响应");
+            }
+            
+        } catch (error) {
+            console.error("API调用失败:", error);
+            throw error;
+        }
     }
     
     async function getAIResponse(userMessage) {
         try {
             return await callSparkAPI(userMessage);
         } catch (error) {
-            console.error("API错误:", error);
-            return `抱歉，API调用失败: ${error}`;
+            return `抱歉，API调用失败: ${error.message}`;
         }
     }
     
@@ -253,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('ai', response);
         } catch (error) {
             document.getElementById('typingIndicator')?.remove();
-            addMessage('ai', `错误: ${error}`);
+            addMessage('ai', `错误: ${error.message}`);
         }
     }
     
@@ -262,15 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
     userInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
     
     saveApiKeyButton.addEventListener('click', () => {
-        const key = apiKeyInput.value.trim();
-        if (key) {
-            apiKey = key;
-            localStorage.setItem('celebrityChatApiKey', apiKey);
-            apiKeyInput.value = '••••••••••••••••';
-            alert('API密钥已保存！');
-        } else {
-            alert('请输入API密钥');
-        }
+        alert('API密钥已内置配置中');
     });
     
     clearChatButton.addEventListener('click', () => {
