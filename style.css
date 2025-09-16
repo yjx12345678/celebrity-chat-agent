@@ -166,6 +166,24 @@ header p {
     padding: 10px;
 }
 
+.connection-status {
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 5px 0;
+    font-size: 12px;
+    text-align: center;
+}
+
+.connected {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.disconnected {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
 .input-area {
     display: flex;
     padding: 15px;
