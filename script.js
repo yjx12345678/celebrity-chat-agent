@@ -7,6 +7,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let currentCelebrity = 'jay';
     let conversationHistory = [];
+    let currentWebSocket = null;
+    
+    // WebSocket API配置
+    const SPARK_CONFIG = {
+        API_KEY: "157667d9f972963adacc2bc7a506f55f",
+        API_SECRET: "YWFiNDc3NmRhMDkxMjhhZDFiYjE2OWEw",
+        APP_ID: "11fa6957",
+        API_URL: "wss://spark-api.xf-yun.com/v1/x1"
+    };
     
     // 从localStorage加载数据
     function loadFromStorage() {
@@ -91,48 +100,147 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // 调用Netlify Function
+    // 生成WebSocket认证URL
+    function generateWebSocketURL() {
+        const host = "spark-api.xf-yun.com";
+        const path = "/v1/x1";
+        const date = new Date().toUTCString();
+        
+        // 生成签名
+        const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+        const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, SPARK_CONFIG.API_SECRET);
+        const signature = CryptoJS.enc.Base64.stringify(signatureSha);
+        
+        // 生成授权参数
+        const authorizationOrigin = `api_key="${SPARK_CONFIG.API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+        const authorization = Buffer.from(authorizationOrigin).toString('base64');
+        
+        // 返回WebSocket URL
+        return `wss://${host}${path}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
+    }
+    
+    // 调用星火WebSocket API
     async function callSparkAPI(userMessage) {
-        try {
+        return new Promise((resolve, reject) => {
+            const wsUrl = generateWebSocketURL();
+            const ws = new WebSocket(wsUrl);
+            currentWebSocket = ws;
+            
+            let fullResponse = "";
+            let responseReceived = false;
+            
             const celebrityInfo = getCelebrityInfo(currentCelebrity);
             
-            const response = await fetch('/.netlify/functions/spark-chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: userMessage,
-                    celebrity: currentCelebrity,
-                    history: conversationHistory.slice(-6) // 发送最近6条消息作为上下文
-                })
-            });
+            ws.onopen = () => {
+                console.log("WebSocket连接已建立");
+                
+                const requestData = {
+                    header: {
+                        app_id: SPARK_CONFIG.APP_ID,
+                        uid: "user123"
+                    },
+                    parameter: {
+                        chat: {
+                            domain: "general",
+                            temperature: 0.7,
+                            max_tokens: 2048
+                        }
+                    },
+                    payload: {
+                        message: {
+                            text: [
+                                {
+                                    role: "user",
+                                    content: `请你扮演${celebrityInfo.name}，使用${celebrityInfo.style}与用户对话。保持角色一致性，模仿该明星的说话方式和特点。用户说：${userMessage}`
+                                }
+                            ]
+                        }
+                    }
+                };
+                
+                console.log("发送请求:", JSON.stringify(requestData));
+                ws.send(JSON.stringify(requestData));
+            };
             
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP错误: ${response.status}`);
-            }
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("收到消息:", data);
+                    
+                    if (data.payload && data.payload.choices && data.payload.choices.text) {
+                        data.payload.choices.text.forEach(text => {
+                            if (text.content && text.content !== "null") {
+                                fullResponse += text.content;
+                            }
+                        });
+                    }
+                    
+                    // 检查会话是否结束
+                    if (data.header && data.header.status === 2) {
+                        responseReceived = true;
+                        ws.close();
+                        if (fullResponse) {
+                            resolve(fullResponse);
+                        } else {
+                            resolve("抱歉，我没有理解您的意思，可以再说一次吗？");
+                        }
+                    }
+                } catch (error) {
+                    console.error("解析消息错误:", error);
+                }
+            };
             
-            const data = await response.json();
-            return data.response;
+            ws.onerror = (error) => {
+                console.error("WebSocket错误:", error);
+                reject(new Error("网络连接失败，请检查网络设置"));
+            };
             
-        } catch (error) {
-            console.error("API调用失败:", error);
-            throw error;
-        }
+            ws.onclose = (event) => {
+                currentWebSocket = null;
+                if (!responseReceived && !fullResponse) {
+                    reject(new Error("连接已关闭，未收到完整响应"));
+                }
+            };
+            
+            // 设置超时
+            setTimeout(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                }
+                if (!responseReceived) {
+                    reject(new Error("请求超时，请重试"));
+                }
+            }, 30000); // 30秒超时
+        });
     }
     
     async function getAIResponse(userMessage) {
         try {
             return await callSparkAPI(userMessage);
         } catch (error) {
-            return `抱歉，API调用失败: ${error.message}`;
+            console.error("API调用失败:", error);
+            
+            if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+                return "网络连接失败，请检查您的网络设置后重试。";
+            } else if (error.message.includes('timeout')) {
+                return "请求超时，可能是网络较慢，请稍后重试。";
+            } else if (error.message.includes('Unauthorized')) {
+                return "API认证失败，请检查API密钥配置。";
+            } else {
+                return `抱歉，暂时无法处理您的请求: ${error.message}`;
+            }
         }
     }
     
     async function sendMessage() {
         const message = userInput.value.trim();
         if (!message) return;
+        
+        // 关闭之前的连接（如果有）
+        if (currentWebSocket) {
+            currentWebSocket.close();
+            currentWebSocket = null;
+        }
         
         addMessage('user', message);
         userInput.value = '';
