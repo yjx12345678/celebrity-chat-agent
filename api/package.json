@@ -1,1 +1,8 @@
-
+{
+  "name": "spark-api-proxy",
+  "version": "1.0.0",
+  "description": "星火API代理服务",
+  "dependencies": {
+    "crypto-js": "^4.1.1"
+  }
+}
