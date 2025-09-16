@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>明星AI聊天分身</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 添加CryptoJS用于WebSocket认证 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,7 +16,7 @@
         </header>
 
         <div class="info-banner">
-            <p>🌟 已启用内置API账户，无需配置即可开始聊天</p>
+            <p>🌟 已启用WebSocket直接连接，无需后端配置</p>
         </div>
 
         <div class="celebrity-selection">
@@ -26,7 +28,7 @@
 
         <div class="chat-container">
             <div id="chatMessages" class="chat-messages">
-             
+                <!-- 消息将在这里动态添加 -->
             </div>
             
             <div class="input-area">
@@ -37,7 +39,7 @@
         </div>
 
         <footer>
-            <p>使用星火大模型API | 本服务有使用限额，请合理使用</p>
+            <p>使用星火大模型WebSocket API | 实时聊天体验</p>
         </footer>
     </div>
 
