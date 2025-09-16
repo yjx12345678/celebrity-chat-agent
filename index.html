@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>明星聊天Agent - 周杰伦、蔡徐坤、刘亦菲</title>
+    <title>明星聊天Agent - 真实API版</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -194,6 +194,15 @@
         .system-message {
             align-self: center;
             background: var(--info);
+            color: white;
+            max-width: 90%;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .error-message {
+            align-self: center;
+            background: var(--danger);
             color: white;
             max-width: 90%;
             text-align: center;
@@ -447,7 +456,8 @@
             APISecret: "YWFiNDc3NnnRhMDkxMjhhZDFiYjE2OVEW",
             APIKey: "157667d9f972963adacc2bc7a506f55f",
             host: "spark-api.xf-yun.com",
-            path: "/v1/x1",
+            path: "/v1.1/chat",
+            version: "v1.1"
         };
         
         // 全局变量
@@ -526,36 +536,123 @@
                 }
             }
             
-            // 模拟API连接过程
-            setTimeout(() => {
-                // 在实际应用中，这里应该建立真实的WebSocket连接
-                // 由于星火API的WebSocket连接需要特定的鉴权方式
-                // 这里我们模拟连接成功的情况
-                
-                // 模拟连接成功
-                simulateSuccessfulConnection();
-                
-                // 实际代码应该是:
-                // connectWebSocket();
-            }, 2000);
+            // 建立WebSocket连接
+            connectWebSocket();
         }
         
-        // 模拟成功连接
-        function simulateSuccessfulConnection() {
-            isWebSocketConnected = true;
-            updateApiStatus('已连接', 'connected');
+        // 连接到星火API
+        function connectWebSocket() {
+            try {
+                // 生成鉴权URL
+                const authUrl = generateAuthUrl();
+                
+                // 创建WebSocket连接
+                webSocket = new WebSocket(authUrl);
+                
+                webSocket.onopen = function() {
+                    isWebSocketConnected = true;
+                    updateApiStatus('已连接', 'connected');
+                    
+                    // 清除系统消息
+                    const systemMessages = chatMessages.querySelectorAll('.system-message');
+                    systemMessages.forEach(msg => msg.remove());
+                    
+                    // 添加欢迎消息
+                    addMessage(`嗨！我是${getCelebrityName(selectedCelebrity)}，很高兴和你聊天！`, 'bot');
+                    
+                    // 启用输入框和按钮
+                    userInput.disabled = false;
+                    sendBtn.disabled = false;
+                    userInput.placeholder = "输入消息...";
+                    
+                    console.log('WebSocket连接已建立');
+                };
+                
+                webSocket.onerror = function(error) {
+                    isWebSocketConnected = false;
+                    updateApiStatus('连接错误', 'disconnected');
+                    console.error('WebSocket错误:', error);
+                    addMessage("连接API时发生错误，请检查网络连接和API配置。", 'error');
+                };
+                
+                webSocket.onclose = function() {
+                    isWebSocketConnected = false;
+                    updateApiStatus('已断开', 'disconnected');
+                    console.log('WebSocket连接已关闭');
+                    
+                    // 禁用输入框和按钮
+                    userInput.disabled = true;
+                    sendBtn.disabled = true;
+                    userInput.placeholder = "连接已断开，请重新连接";
+                    
+                    // 尝试重新连接
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        setTimeout(() => {
+                            addMessage(`尝试重新连接 (${reconnectAttempts}/${maxReconnectAttempts})...`, 'system');
+                            connectWebSocket();
+                        }, 2000);
+                    } else {
+                        addMessage("连接失败，请点击重新连接按钮手动重试。", 'error');
+                    }
+                };
+                
+                webSocket.onmessage = function(e) {
+                    const data = JSON.parse(e.data);
+                    
+                    if (data.header.code !== 0) {
+                        console.error('API错误:', data.header.message, data.header.code);
+                        addMessage(`抱歉，API返回错误: ${data.header.message} (代码: ${data.header.code})`, 'error');
+                        hideTyping();
+                        return;
+                    }
+                    
+                    // 处理返回的数据
+                    const text = data.payload.choices.text[0].content;
+                    
+                    if (data.header.status === 2) { // 最终结果
+                        // 保存到对话历史
+                        conversationHistory.push({ role: 'assistant', content: text });
+                        saveConversationHistory();
+                        
+                        // 添加到聊天界面
+                        addMessage(text, 'bot');
+                        hideTyping();
+                    }
+                };
+            } catch (error) {
+                console.error('连接失败:', error);
+                addMessage(`连接失败: ${error.message}`, 'error');
+                updateApiStatus('连接失败', 'disconnected');
+            }
+        }
+        
+        // 生成鉴权URL
+        function generateAuthUrl() {
+            // 根据星火API文档生成鉴权URL
+            // 这里使用简化的版本，实际实现需要按照官方文档
             
-            // 清除系统消息
-            const systemMessages = chatMessages.querySelectorAll('.system-message');
-            systemMessages.forEach(msg => msg.remove());
+            const apiKey = config.APIKey;
+            const apiSecret = config.APISecret;
+            const host = config.host;
+            const path = config.path;
             
-            // 添加欢迎消息
-            addMessage(`嗨！我是${getCelebrityName(selectedCelebrity)}，很高兴和你聊天！`, 'bot');
+            // 生成RFC1123格式的时间戳
+            const date = new Date().toUTCString();
             
-            // 启用输入框和按钮
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-            userInput.placeholder = "输入消息...";
+            // 生成签名字符串
+            const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+            
+            // 使用HMAC-SHA256算法加密
+            const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
+            const signature = CryptoJS.enc.Base64.stringify(signatureSha);
+            
+            // 生成authorization
+            const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+            const authorization = btoa(authorizationOrigin);
+            
+            // 生成最终URL
+            return `wss://${host}${path}?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
         }
         
         // 获取明星名称
@@ -578,12 +675,12 @@
             return prompts[celebrityId] || '你是一位受欢迎的明星。';
         }
         
-        // 发送消息
+        // 发送消息到星火API
         function sendMessage() {
             const message = userInput.value.trim();
             if (!message) return;
             
-            if (!isWebSocketConnected) {
+            if (!isWebSocketConnected || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
                 addMessage("抱歉，服务连接已断开，请点击重新连接按钮。", 'system');
                 return;
             }
@@ -601,75 +698,51 @@
             // 显示打字指示器
             showTyping();
             
-            // 模拟API响应延迟
-            setTimeout(() => {
-                // 隐藏打字指示器
+            try {
+                // 准备请求数据
+                const requestData = {
+                    header: {
+                        app_id: config.APPID,
+                        uid: "user123"
+                    },
+                    parameter: {
+                        chat: {
+                            domain: "general",
+                            temperature: 0.5,
+                            max_tokens: 1024
+                        }
+                    },
+                    payload: {
+                        message: {
+                            text: [
+                                { role: 'system', content: getCelebrityPrompt(selectedCelebrity) },
+                                ...conversationHistory.slice(-6) // 发送最近6条对话作为上下文
+                            ]
+                        }
+                    }
+                };
+                
+                // 发送请求
+                webSocket.send(JSON.stringify(requestData));
+            } catch (error) {
+                console.error('发送消息失败:', error);
+                addMessage("发送消息时发生错误，请重试。", 'error');
                 hideTyping();
-                
-                // 生成模拟响应
-                const response = generateResponse(message, selectedCelebrity);
-                
-                // 保存到对话历史
-                conversationHistory.push({ role: 'assistant', content: response });
-                saveConversationHistory();
-                
-                // 添加到聊天界面
-                addMessage(response, 'bot');
-            }, 1500 + Math.random() * 1000); // 随机延迟，模拟真实响应时间
-        }
-        
-        // 生成模拟响应
-        function generateResponse(message, celebrity) {
-            // 周杰伦风格回应
-            if (celebrity === 'jay') {
-                const responses = [
-                    "哎哟，不错哦！这个问题很有意思~",
-                    "你知道吗，我最近在写新歌，灵感就来自这种话题！",
-                    "嗯哼，这个问题让我想起了我的一首歌...",
-                    "哎哟，蛮有深度的嘛！像我这种音乐诗人就喜欢这种话题~",
-                    "你说这个让我想起拍电影的时候，周导可是很严格的！",
-                    "音乐是我的生命，没有音乐我就活不下去，懂吗？",
-                    "这个问题...让我想想，就像写歌一样需要灵感~"
-                ];
-                return responses[Math.floor(Math.random() * responses.length)];
             }
-            
-            // 蔡徐坤风格回应
-            if (celebrity === 'kun') {
-                const responses = [
-                    "感谢你的提问，我会继续努力带来更好的作品！",
-                    "这个问题很好，我觉得作为偶像就是要传递正能量~",
-                    "其实我平时也很喜欢思考这类问题，让我们一起进步吧！",
-                    "IKUN们总是能提出这么有深度的问题，感谢支持！",
-                    "音乐和舞蹈是我表达自我的方式，希望你也能找到自己的热爱~",
-                    "保持真实，做自己，这就是我的态度！",
-                    "感谢关注，我会用作品回报大家的支持！"
-                ];
-                return responses[Math.floor(Math.random() * responses.length)];
-            }
-            
-            // 刘亦菲风格回应
-            if (celebrity === 'fei') {
-                const responses = [
-                    "这个问题很有趣呢，让我想想怎么回答~",
-                    "平时看书的时候也思考过类似的问题，我觉得...",
-                    "你的视角很独特，我很欣赏~",
-                    "作为一个演员，我常常需要深入思考各种问题，这让我成长很多",
-                    "温柔地对待世界，世界也会温柔待你，这是我的生活哲学~",
-                    "有时候静下心来感受生活，会有不一样的发现",
-                    "每个人都有自己的故事，重要的是保持真诚和善良"
-                ];
-                return responses[Math.floor(Math.random() * responses.length)];
-            }
-            
-            return "这个问题很有意思，让我想想怎么回答~";
         }
         
         // 添加消息到聊天界面
         function addMessage(text, sender) {
             const messageElement = document.createElement('div');
-            messageElement.classList.add('message');
-            messageElement.classList.add(sender + '-message');
+            
+            if (sender === 'error') {
+                messageElement.classList.add('message', 'error-message');
+            } else if (sender === 'system') {
+                messageElement.classList.add('message', 'system-message');
+            } else {
+                messageElement.classList.add('message');
+                messageElement.classList.add(sender + '-message');
+            }
             
             const messageText = document.createElement('p');
             messageText.textContent = text;
@@ -749,5 +822,8 @@
             addMessage(`聊天记录已清除，我是${getCelebrityName(selectedCelebrity)}，来和我聊天吧！`, 'bot');
         }
     </script>
+    
+    <!-- 引入CryptoJS用于生成签名 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </body>
 </html>
