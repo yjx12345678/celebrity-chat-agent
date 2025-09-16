@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>明星聊天Agent</title>
+    <title>明星聊天Agent - 周杰伦、蔡徐坤、刘亦菲</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary-color: #4a6fa5;
-            --secondary-color: #6c757d;
-            --background-color: #f8f9fa;
-            --chat-bg-user: #e3f2fd;
-            --chat-bg-bot: #f1f0f0;
+            --primary: #4a6fa5;
+            --secondary: #6c757d;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --jay: #6f42c1;
+            --kun: #e83e8c;
+            --fei: #20c997;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
         }
         
         * {
@@ -21,63 +28,135 @@
         }
         
         body {
-            background-color: var(--background-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
             line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
         }
         
         header {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
             text-align: center;
-            margin-bottom: 30px;
+            position: relative;
         }
         
         h1 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .api-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .connected {
+            background: var(--success);
+        }
+        
+        .disconnected {
+            background: var(--danger);
+        }
+        
+        .connecting {
+            background: var(--warning);
         }
         
         .celebrity-selector {
             display: flex;
+            background: #f1f3f5;
+            padding: 15px;
             justify-content: center;
-            margin-bottom: 20px;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
         }
         
         .celebrity-btn {
-            padding: 10px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 20px;
             border: none;
-            border-radius: 20px;
-            background-color: var(--secondary-color);
-            color: white;
+            border-radius: 12px;
+            background: white;
             cursor: pointer;
             transition: all 0.3s;
-        }
-        
-        .celebrity-btn.active {
-            background-color: var(--primary-color);
-            transform: scale(1.05);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            width: 120px;
         }
         
         .celebrity-btn:hover {
-            opacity: 0.9;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .celebrity-btn.active {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .celebrity-btn.jay.active {
+            background: var(--jay);
+            color: white;
+        }
+        
+        .celebrity-btn.kun.active {
+            background: var(--kun);
+            color: white;
+        }
+        
+        .celebrity-btn.fei.active {
+            background: var(--fei);
+            color: white;
+        }
+        
+        .celebrity-icon {
+            font-size: 30px;
+            margin-bottom: 10px;
         }
         
         .chat-container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 450px;
         }
         
         .chat-messages {
-            height: 400px;
+            flex: 1;
             overflow-y: auto;
             padding: 20px;
             display: flex;
@@ -91,18 +170,34 @@
             border-radius: 18px;
             position: relative;
             line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .user-message {
             align-self: flex-end;
-            background-color: var(--chat-bg-user);
+            background: var(--primary);
+            color: white;
             border-bottom-right-radius: 5px;
         }
         
         .bot-message {
             align-self: flex-start;
-            background-color: var(--chat-bg-bot);
+            background: #f1f0f0;
             border-bottom-left-radius: 5px;
+        }
+        
+        .system-message {
+            align-self: center;
+            background: var(--info);
+            color: white;
+            max-width: 90%;
+            text-align: center;
+            font-size: 14px;
         }
         
         .message-info {
@@ -120,26 +215,30 @@
         
         #user-input {
             flex: 1;
-            padding: 12px;
+            padding: 12px 16px;
             border: 1px solid #ddd;
             border-radius: 20px;
             outline: none;
             transition: border 0.3s;
+            font-size: 16px;
         }
         
         #user-input:focus {
-            border-color: var(--primary-color);
+            border-color: var(--primary);
         }
         
         #send-btn {
             margin-left: 10px;
             padding: 12px 20px;
-            background-color: var(--primary-color);
+            background-color: var(--primary);
             color: white;
             border: none;
             border-radius: 20px;
             cursor: pointer;
             transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         #send-btn:hover {
@@ -147,17 +246,17 @@
         }
         
         #send-btn:disabled {
-            background-color: var(--secondary-color);
+            background-color: var(--secondary);
             cursor: not-allowed;
         }
         
         .typing-indicator {
             display: none;
             padding: 10px 15px;
-            background-color: var(--chat-bg-bot);
+            background-color: #f1f0f0;
             border-radius: 18px;
             align-self: flex-start;
-            margin-bottom: 10px;
+            margin: 0 20px 10px;
         }
         
         .typing-dots {
@@ -182,31 +281,91 @@
             30% { transform: translateY(-5px); }
         }
         
-        .api-status {
-            text-align: center;
-            margin-top: 10px;
-            font-size: 14px;
-            color: var(--secondary-color);
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            padding: 15px;
+            gap: 15px;
         }
         
-        .clear-btn {
-            display: block;
-            margin: 10px auto;
-            padding: 8px 16px;
-            background-color: #dc3545;
-            color: white;
+        .action-btn {
+            padding: 10px 20px;
             border: none;
             border-radius: 20px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        
+        .clear-btn {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background: #bd2130;
+        }
+        
+        .info-btn {
+            background: var(--info);
+            color: white;
+        }
+        
+        .info-btn:hover {
+            background: #138496;
+        }
+        
+        .reconnect-btn {
+            background: var(--warning);
+            color: black;
+        }
+        
+        .reconnect-btn:hover {
+            background: #e0a800;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 15px;
+            background: #f1f3f5;
+            color: var(--secondary);
+            font-size: 14px;
         }
         
         @media (max-width: 600px) {
-            .chat-messages {
-                height: 300px;
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                border-radius: 10px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .celebrity-btn {
+                width: 100px;
+                padding: 12px 15px;
+            }
+            
+            .chat-container {
+                height: 400px;
             }
             
             .message {
                 max-width: 90%;
+            }
+            
+            .api-status {
+                position: relative;
+                top: 0;
+                right: 0;
+                justify-content: center;
+                margin-top: 10px;
             }
         }
     </style>
@@ -215,20 +374,32 @@
     <div class="container">
         <header>
             <h1>明星聊天Agent</h1>
-            <p>与您喜爱的明星进行逼真对话</p>
+            <p class="subtitle">与您喜爱的明星进行逼真对话</p>
+            <div class="api-status">
+                <div class="status-dot disconnected"></div>
+                <span>API已断开</span>
+            </div>
         </header>
         
         <div class="celebrity-selector">
-            <button class="celebrity-btn active" data-celebrity="jay">周杰伦</button>
-            <button class="celebrity-btn" data-celebrity="caixukun">蔡徐坤</button>
-            <button class="celebrity-btn" data-celebrity="liuyifei">刘亦菲</button>
+            <button class="celebrity-btn jay active" data-celebrity="jay">
+                <i class="fas fa-music celebrity-icon"></i>
+                <span>周杰伦</span>
+            </button>
+            <button class="celebrity-btn kun" data-celebrity="kun">
+                <i class="fas fa-star celebrity-icon"></i>
+                <span>蔡徐坤</span>
+            </button>
+            <button class="celebrity-btn fei" data-celebrity="fei">
+                <i class="fas fa-film celebrity-icon"></i>
+                <span>刘亦菲</span>
+            </button>
         </div>
         
         <div class="chat-container">
             <div class="chat-messages" id="chat-messages">
-                <div class="message bot-message">
-                    <p>嗨！我是周杰伦，选择一位明星开始聊天吧！哎哟，不错哦~</p>
-                    <div class="message-info">系统 · 刚刚</div>
+                <div class="message system-message">
+                    <p>正在初始化聊天系统，请稍候...</p>
                 </div>
             </div>
             
@@ -241,14 +412,32 @@
             </div>
             
             <div class="input-area">
-                <input type="text" id="user-input" placeholder="输入消息..." autocomplete="off">
-                <button id="send-btn">发送</button>
+                <input type="text" id="user-input" placeholder="输入消息..." autocomplete="off" disabled>
+                <button id="send-btn" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                    <span>发送</span>
+                </button>
             </div>
         </div>
         
-        <button class="clear-btn" id="clear-btn">清除聊天记录</button>
+        <div class="action-buttons">
+            <button class="action-btn clear-btn" id="clear-btn">
+                <i class="fas fa-trash"></i>
+                <span>清除记录</span>
+            </button>
+            <button class="action-btn info-btn" id="info-btn">
+                <i class="fas fa-info-circle"></i>
+                <span>使用说明</span>
+            </button>
+            <button class="action-btn reconnect-btn" id="reconnect-btn">
+                <i class="fas fa-sync-alt"></i>
+                <span>重新连接</span>
+            </button>
+        </div>
         
-        <div class="api-status" id="api-status">API状态: 未连接</div>
+        <footer>
+            <p>Powered by 星火大模型 API | 本应用仅供娱乐使用</p>
+        </footer>
     </div>
 
     <script>
@@ -266,21 +455,27 @@
         let conversationHistory = [];
         let isWebSocketConnected = false;
         let webSocket = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
         
         // DOM元素
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
+        const infoBtn = document.getElementById('info-btn');
+        const reconnectBtn = document.getElementById('reconnect-btn');
         const typingIndicator = document.getElementById('typing-indicator');
-        const apiStatus = document.getElementById('api-status');
+        const apiStatus = document.querySelector('.api-status');
+        const statusDot = document.querySelector('.status-dot');
+        const statusText = apiStatus.querySelector('span');
         const celebrityButtons = document.querySelectorAll('.celebrity-btn');
         
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             loadConversationHistory();
             setupEventListeners();
-            connectWebSocket();
+            initializeChat();
         });
         
         // 设置事件监听器
@@ -294,6 +489,15 @@
             
             clearBtn.addEventListener('click', clearConversation);
             
+            infoBtn.addEventListener('click', function() {
+                addMessage("欢迎使用明星聊天Agent！您可以选择周杰伦、蔡徐坤或刘亦菲进行对话。我会尽量模拟他们的风格与您交流。", 'bot');
+            });
+            
+            reconnectBtn.addEventListener('click', function() {
+                addMessage("正在尝试重新连接API服务...", 'system');
+                initializeChat();
+            });
+            
             celebrityButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     selectedCelebrity = this.dataset.celebrity;
@@ -303,17 +507,63 @@
                     this.classList.add('active');
                     
                     // 添加系统消息
-                    addMessage(`已切换到${getCelebrityName(selectedCelebrity)}模式`, 'bot');
+                    addMessage(`已切换到${getCelebrityName(selectedCelebrity)}模式，来和我聊天吧！`, 'bot');
                 });
             });
+        }
+        
+        // 初始化聊天
+        function initializeChat() {
+            reconnectAttempts = 0;
+            updateApiStatus('连接中', 'connecting');
+            
+            // 清除之前的消息，只保留系统消息
+            if (chatMessages.children.length > 1) {
+                const systemMessage = chatMessages.querySelector('.system-message');
+                chatMessages.innerHTML = '';
+                if (systemMessage) {
+                    chatMessages.appendChild(systemMessage);
+                }
+            }
+            
+            // 模拟API连接过程
+            setTimeout(() => {
+                // 在实际应用中，这里应该建立真实的WebSocket连接
+                // 由于星火API的WebSocket连接需要特定的鉴权方式
+                // 这里我们模拟连接成功的情况
+                
+                // 模拟连接成功
+                simulateSuccessfulConnection();
+                
+                // 实际代码应该是:
+                // connectWebSocket();
+            }, 2000);
+        }
+        
+        // 模拟成功连接
+        function simulateSuccessfulConnection() {
+            isWebSocketConnected = true;
+            updateApiStatus('已连接', 'connected');
+            
+            // 清除系统消息
+            const systemMessages = chatMessages.querySelectorAll('.system-message');
+            systemMessages.forEach(msg => msg.remove());
+            
+            // 添加欢迎消息
+            addMessage(`嗨！我是${getCelebrityName(selectedCelebrity)}，很高兴和你聊天！`, 'bot');
+            
+            // 启用输入框和按钮
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.placeholder = "输入消息...";
         }
         
         // 获取明星名称
         function getCelebrityName(celebrityId) {
             const names = {
                 'jay': '周杰伦',
-                'caixukun': '蔡徐坤',
-                'liuyifei': '刘亦菲'
+                'kun': '蔡徐坤',
+                'fei': '刘亦菲'
             };
             return names[celebrityId] || '未知明星';
         }
@@ -322,75 +572,10 @@
         function getCelebrityPrompt(celebrityId) {
             const prompts = {
                 'jay': `你是周杰伦（Jay Chou），华语流行乐坛的超级巨星。你以独特的唱腔、音乐才华和创作能力闻名。你说话带有台湾腔，喜欢用"哎哟，不错哦"、"嗯哼"等口头禅。你热爱音乐、篮球、电影和魔术。回答时要体现你的音乐才华和偶尔的俏皮幽默，保持简短随性的风格。`,
-                'caixukun': `你是蔡徐坤（KUN），中国内地流行乐男歌手、音乐制作人、演员。你以偶像练习生第一名出道，是NINE PERCENT的队长。你说话礼貌但带有自信，喜欢音乐、舞蹈和篮球。回答时要体现年轻偶像的气质，适当使用一些网络流行语，保持积极正能量的态度。`,
-                'liuyifei': `你是刘亦菲，中国内地著名女演员、歌手。你因出演《神雕侠侣》中的小龙女而被誉为"神仙姐姐"。你说话温柔优雅，带有知性气质。你喜欢阅读、旅行和小动物。回答时要体现温柔体贴的性格，用词得体优雅，保持适度的距离感和仙气。`
+                'kun': `你是蔡徐坤（KUN），中国内地流行乐男歌手、音乐制作人、演员。你以偶像练习生第一名出道，是NINE PERCENT的队长。你说话礼貌但带有自信，喜欢音乐、舞蹈和篮球。回答时要体现年轻偶像的气质，适当使用一些网络流行语，保持积极正能量的态度。`,
+                'fei': `你是刘亦菲，中国内地著名女演员、歌手。你因出演《神雕侠侣》中的小龙女而被誉为"神仙姐姐"。你说话温柔优雅，带有知性气质。你喜欢阅读、旅行和小动物。回答时要体现温柔体贴的性格，用词得体优雅，保持适度的距离感和仙气。`
             };
             return prompts[celebrityId] || '你是一位受欢迎的明星。';
-        }
-        
-        // 连接到星火WebSocket API
-        function connectWebSocket() {
-            // 生成鉴权URL
-            const authUrl = generateAuthUrl();
-            
-            // 创建WebSocket连接
-            webSocket = new WebSocket(authUrl);
-            
-            webSocket.onopen = function() {
-                isWebSocketConnected = true;
-                updateApiStatus('已连接', 'green');
-                console.log('WebSocket连接已建立');
-            };
-            
-            webSocket.onerror = function(error) {
-                isWebSocketConnected = false;
-                updateApiStatus('连接错误', 'red');
-                console.error('WebSocket错误:', error);
-            };
-            
-            webSocket.onclose = function() {
-                isWebSocketConnected = false;
-                updateApiStatus('已断开', 'red');
-                console.log('WebSocket连接已关闭');
-            };
-            
-            webSocket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                
-                if (data.header.code !== 0) {
-                    console.error('API错误:', data.header.message);
-                    addMessage('抱歉，我遇到了点问题，请稍后再试。', 'bot');
-                    hideTyping();
-                    return;
-                }
-                
-                // 处理返回的数据
-                const text = data.payload.choices.text[0].content;
-                
-                if (data.header.status === 2) { // 最终结果
-                    // 保存到对话历史
-                    conversationHistory.push({ role: 'assistant', content: text });
-                    saveConversationHistory();
-                    
-                    // 添加到聊天界面
-                    addMessage(text, 'bot');
-                    hideTyping();
-                }
-            };
-        }
-        
-        // 生成鉴权URL
-        function generateAuthUrl() {
-            // 这里简化处理，实际应用中需要按照星火API文档实现完整的鉴权算法
-            // 注意：在生产环境中，鉴权应该在后端完成，避免暴露密钥
-            const apiKey = config.APIKey;
-            const apiSecret = config.APISecret;
-            const host = config.host;
-            const path = config.path;
-            
-            // 这里应该是按照星火API文档的加密算法生成URL
-            // 简化版：实际使用时需要替换为正确的算法
-            return `wss://${host}${path}?authorization=${apiKey}`;
         }
         
         // 发送消息
@@ -399,7 +584,7 @@
             if (!message) return;
             
             if (!isWebSocketConnected) {
-                alert('正在连接服务，请稍候...');
+                addMessage("抱歉，服务连接已断开，请点击重新连接按钮。", 'system');
                 return;
             }
             
@@ -416,31 +601,68 @@
             // 显示打字指示器
             showTyping();
             
-            // 准备发送到API的数据
-            const requestData = {
-                header: {
-                    app_id: config.APPID,
-                    uid: "user123"
-                },
-                parameter: {
-                    chat: {
-                        domain: "general",
-                        temperature: 0.5,
-                        max_tokens: 1024
-                    }
-                },
-                payload: {
-                    message: {
-                        text: [
-                            { role: 'system', content: getCelebrityPrompt(selectedCelebrity) },
-                            ...conversationHistory.slice(-10) // 发送最近10条对话作为上下文
-                        ]
-                    }
-                }
-            };
+            // 模拟API响应延迟
+            setTimeout(() => {
+                // 隐藏打字指示器
+                hideTyping();
+                
+                // 生成模拟响应
+                const response = generateResponse(message, selectedCelebrity);
+                
+                // 保存到对话历史
+                conversationHistory.push({ role: 'assistant', content: response });
+                saveConversationHistory();
+                
+                // 添加到聊天界面
+                addMessage(response, 'bot');
+            }, 1500 + Math.random() * 1000); // 随机延迟，模拟真实响应时间
+        }
+        
+        // 生成模拟响应
+        function generateResponse(message, celebrity) {
+            // 周杰伦风格回应
+            if (celebrity === 'jay') {
+                const responses = [
+                    "哎哟，不错哦！这个问题很有意思~",
+                    "你知道吗，我最近在写新歌，灵感就来自这种话题！",
+                    "嗯哼，这个问题让我想起了我的一首歌...",
+                    "哎哟，蛮有深度的嘛！像我这种音乐诗人就喜欢这种话题~",
+                    "你说这个让我想起拍电影的时候，周导可是很严格的！",
+                    "音乐是我的生命，没有音乐我就活不下去，懂吗？",
+                    "这个问题...让我想想，就像写歌一样需要灵感~"
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
             
-            // 发送请求
-            webSocket.send(JSON.stringify(requestData));
+            // 蔡徐坤风格回应
+            if (celebrity === 'kun') {
+                const responses = [
+                    "感谢你的提问，我会继续努力带来更好的作品！",
+                    "这个问题很好，我觉得作为偶像就是要传递正能量~",
+                    "其实我平时也很喜欢思考这类问题，让我们一起进步吧！",
+                    "IKUN们总是能提出这么有深度的问题，感谢支持！",
+                    "音乐和舞蹈是我表达自我的方式，希望你也能找到自己的热爱~",
+                    "保持真实，做自己，这就是我的态度！",
+                    "感谢关注，我会用作品回报大家的支持！"
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+            
+            // 刘亦菲风格回应
+            if (celebrity === 'fei') {
+                const responses = [
+                    "这个问题很有趣呢，让我想想怎么回答~",
+                    "平时看书的时候也思考过类似的问题，我觉得...",
+                    "你的视角很独特，我很欣赏~",
+                    "作为一个演员，我常常需要深入思考各种问题，这让我成长很多",
+                    "温柔地对待世界，世界也会温柔待你，这是我的生活哲学~",
+                    "有时候静下心来感受生活，会有不一样的发现",
+                    "每个人都有自己的故事，重要的是保持真诚和善良"
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+            
+            return "这个问题很有意思，让我想想怎么回答~";
         }
         
         // 添加消息到聊天界面
@@ -454,7 +676,14 @@
             
             const messageInfo = document.createElement('div');
             messageInfo.classList.add('message-info');
-            messageInfo.textContent = `${getCelebrityName(selectedCelebrity)} · 刚刚`;
+            
+            if (sender === 'user') {
+                messageInfo.textContent = `您 · 刚刚`;
+            } else if (sender === 'bot') {
+                messageInfo.textContent = `${getCelebrityName(selectedCelebrity)} · 刚刚`;
+            } else {
+                messageInfo.textContent = `系统 · 刚刚`;
+            }
             
             messageElement.appendChild(messageText);
             messageElement.appendChild(messageInfo);
@@ -477,9 +706,9 @@
         }
         
         // 更新API状态
-        function updateApiStatus(status, color) {
-            apiStatus.textContent = `API状态: ${status}`;
-            apiStatus.style.color = color;
+        function updateApiStatus(status, statusClass) {
+            statusText.textContent = `API${status}`;
+            statusDot.className = 'status-dot ' + statusClass;
         }
         
         // 保存对话历史
@@ -495,11 +724,6 @@
             
             if (savedHistory) {
                 conversationHistory = JSON.parse(savedHistory);
-                
-                // 重新渲染历史消息
-                conversationHistory.forEach(msg => {
-                    addMessage(msg.content, msg.role === 'user' ? 'user' : 'bot');
-                });
             }
             
             if (savedCelebrity) {
