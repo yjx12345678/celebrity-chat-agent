@@ -1,7 +1,8 @@
-// 使用ES模块语法，Netlify支持
 import CryptoJS from 'crypto-js';
 
 export const handler = async function(event, context) {
+    console.log('收到请求:', event.body);
+    
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -20,17 +21,28 @@ export const handler = async function(event, context) {
             };
         }
         
+        // 调试：检查环境变量
         const API_KEY = process.env.SPARK_API_KEY;
         const API_SECRET = process.env.SPARK_API_SECRET;
         const APP_ID = process.env.SPARK_APP_ID || "11fa6957";
-        const API_URL = "https://spark-api-open.xf-yun.com/v2/chat/completions";
+        
+        console.log('环境变量检查:');
+        console.log('API_KEY exists:', !!API_KEY);
+        console.log('API_SECRET exists:', !!API_SECRET);
+        console.log('APP_ID:', APP_ID);
         
         if (!API_KEY || !API_SECRET) {
+            console.error('缺少API密钥或Secret');
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'API配置错误，请联系管理员' })
+                body: JSON.stringify({ 
+                    error: 'API配置错误，请联系管理员',
+                    details: `API_KEY: ${!!API_KEY}, API_SECRET: ${!!API_SECRET}`
+                })
             };
         }
+        
+        const API_URL = "https://spark-api-open.xf-yun.com/v2/chat/completions";
         
         function getCelebrityInfo(celeb) {
             const celebrities = {
@@ -66,13 +78,14 @@ export const handler = async function(event, context) {
         }
         
         const authHeaders = generateAuthHeader(API_KEY, API_SECRET);
+        console.log('生成的认证头:', authHeaders);
         
         const messageHistory = [
             {
                 role: "user",
                 content: `请你扮演${celebrityInfo.name}，使用${celebrityInfo.style}与用户对话。保持角色一致性，模仿该明星的说话方式和特点。`
             },
-            ...history,
+            ...(history || []),
             {
                 role: "user",
                 content: message
@@ -98,17 +111,24 @@ export const handler = async function(event, context) {
             }
         };
         
+        console.log('发送到星火API的请求:', JSON.stringify(requestData, null, 2));
+        
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify(requestData)
         });
         
+        console.log('星火API响应状态:', response.status, response.statusText);
+        
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('星火API错误详情:', errorText);
             throw new Error(`星火API错误: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('星火API完整响应:', JSON.stringify(data, null, 2));
         
         if (data.header.code !== 0) {
             throw new Error(`星火API错误: ${data.header.message} (代码: ${data.header.code})`);
@@ -129,7 +149,10 @@ export const handler = async function(event, context) {
         console.error("处理请求时出错:", error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: error.message })
+            body: JSON.stringify({ 
+                error: error.message,
+                type: error.name
+            })
         };
     }
 };
