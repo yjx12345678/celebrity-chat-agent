@@ -452,21 +452,16 @@
     <script>
         // 配置信息
         const config = {
-            APPID: "11fa6957",
-            APISecret: "YWFiNDc3NnnRhMDkxMjhhZDFiYjE2OVEW",
-            APIKey: "157667d9f972963adacc2bc7a506f55f",
-            host: "spark-api.xf-yun.com",
-            path: "/v1.1/chat",
-            version: "v1.1"
+            // 后端API地址 - 部署时需要更新为实际的后端URL
+            apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:3000' 
+                : 'https://your-backend-url.vercel.app'
         };
         
         // 全局变量
         let selectedCelebrity = "jay";
         let conversationHistory = [];
-        let isWebSocketConnected = false;
-        let webSocket = null;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
+        let isApiConnected = false;
         
         // DOM元素
         const chatMessages = document.getElementById('chat-messages');
@@ -485,7 +480,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadConversationHistory();
             setupEventListeners();
-            initializeChat();
+            checkApiConnection();
         });
         
         // 设置事件监听器
@@ -505,7 +500,7 @@
             
             reconnectBtn.addEventListener('click', function() {
                 addMessage("正在尝试重新连接API服务...", 'system');
-                initializeChat();
+                checkApiConnection();
             });
             
             celebrityButtons.forEach(button => {
@@ -522,35 +517,14 @@
             });
         }
         
-        // 初始化聊天
-        function initializeChat() {
-            reconnectAttempts = 0;
-            updateApiStatus('连接中', 'connecting');
+        // 检查API连接状态
+        async function checkApiConnection() {
+            updateApiStatus('检查中', 'connecting');
             
-            // 清除之前的消息，只保留系统消息
-            if (chatMessages.children.length > 1) {
-                const systemMessage = chatMessages.querySelector('.system-message');
-                chatMessages.innerHTML = '';
-                if (systemMessage) {
-                    chatMessages.appendChild(systemMessage);
-                }
-            }
-            
-            // 建立WebSocket连接
-            connectWebSocket();
-        }
-        
-        // 连接到星火API
-        function connectWebSocket() {
             try {
-                // 生成鉴权URL
-                const authUrl = generateAuthUrl();
-                
-                // 创建WebSocket连接
-                webSocket = new WebSocket(authUrl);
-                
-                webSocket.onopen = function() {
-                    isWebSocketConnected = true;
+                const response = await fetch(`${config.apiBaseUrl}/health`);
+                if (response.ok) {
+                    isApiConnected = true;
                     updateApiStatus('已连接', 'connected');
                     
                     // 清除系统消息
@@ -564,95 +538,20 @@
                     userInput.disabled = false;
                     sendBtn.disabled = false;
                     userInput.placeholder = "输入消息...";
-                    
-                    console.log('WebSocket连接已建立');
-                };
-                
-                webSocket.onerror = function(error) {
-                    isWebSocketConnected = false;
-                    updateApiStatus('连接错误', 'disconnected');
-                    console.error('WebSocket错误:', error);
-                    addMessage("连接API时发生错误，请检查网络连接和API配置。", 'error');
-                };
-                
-                webSocket.onclose = function() {
-                    isWebSocketConnected = false;
-                    updateApiStatus('已断开', 'disconnected');
-                    console.log('WebSocket连接已关闭');
-                    
-                    // 禁用输入框和按钮
-                    userInput.disabled = true;
-                    sendBtn.disabled = true;
-                    userInput.placeholder = "连接已断开，请重新连接";
-                    
-                    // 尝试重新连接
-                    if (reconnectAttempts < maxReconnectAttempts) {
-                        reconnectAttempts++;
-                        setTimeout(() => {
-                            addMessage(`尝试重新连接 (${reconnectAttempts}/${maxReconnectAttempts})...`, 'system');
-                            connectWebSocket();
-                        }, 2000);
-                    } else {
-                        addMessage("连接失败，请点击重新连接按钮手动重试。", 'error');
-                    }
-                };
-                
-                webSocket.onmessage = function(e) {
-                    const data = JSON.parse(e.data);
-                    
-                    if (data.header.code !== 0) {
-                        console.error('API错误:', data.header.message, data.header.code);
-                        addMessage(`抱歉，API返回错误: ${data.header.message} (代码: ${data.header.code})`, 'error');
-                        hideTyping();
-                        return;
-                    }
-                    
-                    // 处理返回的数据
-                    const text = data.payload.choices.text[0].content;
-                    
-                    if (data.header.status === 2) { // 最终结果
-                        // 保存到对话历史
-                        conversationHistory.push({ role: 'assistant', content: text });
-                        saveConversationHistory();
-                        
-                        // 添加到聊天界面
-                        addMessage(text, 'bot');
-                        hideTyping();
-                    }
-                };
+                } else {
+                    throw new Error('API健康检查失败');
+                }
             } catch (error) {
-                console.error('连接失败:', error);
-                addMessage(`连接失败: ${error.message}`, 'error');
+                console.error('API连接检查失败:', error);
+                isApiConnected = false;
                 updateApiStatus('连接失败', 'disconnected');
+                addMessage("无法连接到API服务，请确保后端服务正在运行。", 'error');
+                
+                // 禁用输入框和按钮
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+                userInput.placeholder = "连接失败，请重试";
             }
-        }
-        
-        // 生成鉴权URL
-        function generateAuthUrl() {
-            // 根据星火API文档生成鉴权URL
-            // 这里使用简化的版本，实际实现需要按照官方文档
-            
-            const apiKey = config.APIKey;
-            const apiSecret = config.APISecret;
-            const host = config.host;
-            const path = config.path;
-            
-            // 生成RFC1123格式的时间戳
-            const date = new Date().toUTCString();
-            
-            // 生成签名字符串
-            const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
-            
-            // 使用HMAC-SHA256算法加密
-            const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
-            const signature = CryptoJS.enc.Base64.stringify(signatureSha);
-            
-            // 生成authorization
-            const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
-            const authorization = btoa(authorizationOrigin);
-            
-            // 生成最终URL
-            return `wss://${host}${path}?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
         }
         
         // 获取明星名称
@@ -675,12 +574,12 @@
             return prompts[celebrityId] || '你是一位受欢迎的明星。';
         }
         
-        // 发送消息到星火API
-        function sendMessage() {
+        // 发送消息到后端API
+        async function sendMessage() {
             const message = userInput.value.trim();
             if (!message) return;
             
-            if (!isWebSocketConnected || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
+            if (!isApiConnected) {
                 addMessage("抱歉，服务连接已断开，请点击重新连接按钮。", 'system');
                 return;
             }
@@ -701,32 +600,42 @@
             try {
                 // 准备请求数据
                 const requestData = {
-                    header: {
-                        app_id: config.APPID,
-                        uid: "user123"
-                    },
-                    parameter: {
-                        chat: {
-                            domain: "general",
-                            temperature: 0.5,
-                            max_tokens: 1024
-                        }
-                    },
-                    payload: {
-                        message: {
-                            text: [
-                                { role: 'system', content: getCelebrityPrompt(selectedCelebrity) },
-                                ...conversationHistory.slice(-6) // 发送最近6条对话作为上下文
-                            ]
-                        }
-                    }
+                    message: message,
+                    celebrity: selectedCelebrity,
+                    history: conversationHistory.slice(-6), // 发送最近6条对话作为上下文
+                    systemPrompt: getCelebrityPrompt(selectedCelebrity)
                 };
                 
-                // 发送请求
-                webSocket.send(JSON.stringify(requestData));
+                // 发送请求到后端
+                const response = await fetch(`${config.apiBaseUrl}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 保存到对话历史
+                    conversationHistory.push({ role: 'assistant', content: data.response });
+                    saveConversationHistory();
+                    
+                    // 添加到聊天界面
+                    addMessage(data.response, 'bot');
+                } else {
+                    throw new Error(data.error || 'API返回错误');
+                }
             } catch (error) {
                 console.error('发送消息失败:', error);
                 addMessage("发送消息时发生错误，请重试。", 'error');
+            } finally {
+                // 隐藏打字指示器
                 hideTyping();
             }
         }
@@ -797,6 +706,11 @@
             
             if (savedHistory) {
                 conversationHistory = JSON.parse(savedHistory);
+                
+                // 重新渲染历史消息
+                conversationHistory.forEach(msg => {
+                    addMessage(msg.content, msg.role === 'user' ? 'user' : 'bot');
+                });
             }
             
             if (savedCelebrity) {
@@ -822,8 +736,5 @@
             addMessage(`聊天记录已清除，我是${getCelebrityName(selectedCelebrity)}，来和我聊天吧！`, 'bot');
         }
     </script>
-    
-    <!-- 引入CryptoJS用于生成签名 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </body>
 </html>
