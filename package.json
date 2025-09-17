@@ -1,7 +1,7 @@
 {
   "name": "celebrity-chat-backend",
   "version": "1.0.0",
-  "description": "Backend for Celebrity Chat Agent",
+  "description": "Backend for Celebrity Chat Agent with Spark AI API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
