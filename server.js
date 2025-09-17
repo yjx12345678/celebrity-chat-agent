@@ -5,13 +5,15 @@ const CryptoJS = require('crypto-js');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const port = process.env.PORT || 3000;
 
-// 星火API配置
+// 云开发会自动设置端口
+const port = process.env.PORT || 80;
+
+// 星火API配置 - 使用环境变量
 const sparkConfig = {
-    APPID: "11fa6957",
-    APISecret: "YWFiNDc3NnnRhMDkxMjhhZDFiYjE2OVEW",
-    APIKey: "157667d9f972963adacc2bc7a506f55f",
+    APPID: process.env.SPARK_APPID || "11fa6957",
+    APISecret: process.env.SPARK_APISECRET || "YWFiNDc3NnnRhMDkxMjhhZDFiYjE2OVEW",
+    APIKey: process.env.SPARK_APIKEY || "157667d9f972963adacc2bc7a506f55f",
     host: "spark-api.xf-yun.com",
     path: "/v1.1/chat",
 };
@@ -27,20 +29,23 @@ app.get('/health', (req, res) => {
 
 // 生成星火API鉴权URL
 function generateAuthUrl() {
-    const url = `wss://${sparkConfig.host}${sparkConfig.path}`;
     const host = sparkConfig.host;
+    const path = sparkConfig.path;
     const date = new Date().toUTCString();
-    const algorithm = 'hmac-sha256';
-    const headers = 'host date request-line';
-    const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${sparkConfig.path} HTTP/1.1`;
     
+    // 生成签名字符串
+    const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+    
+    // 使用HMAC-SHA256算法加密
     const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, sparkConfig.APISecret);
     const signature = CryptoJS.enc.Base64.stringify(signatureSha);
     
-    const authorizationOrigin = `api_key="${sparkConfig.APIKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
+    // 生成authorization
+    const authorizationOrigin = `api_key="${sparkConfig.APIKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
     const authorization = Buffer.from(authorizationOrigin).toString('base64');
     
-    return `${url}?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
+    // 生成最终URL
+    return `wss://${host}${path}?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
 }
 
 // 聊天端点
@@ -65,7 +70,7 @@ app.post('/chat', async (req, res) => {
                     error: '请求超时' 
                 });
             }
-        }, 10000);
+        }, 15000); // 15秒超时
         
         ws.on('open', () => {
             // 准备请求数据
@@ -106,7 +111,8 @@ app.post('/chat', async (req, res) => {
                 ws.close();
                 res.status(500).json({ 
                     success: false, 
-                    error: `API错误: ${response.header.message}` 
+                    error: `API错误: ${response.header.message}`,
+                    code: response.header.code
                 });
                 return;
             }
