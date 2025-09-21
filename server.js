@@ -6,7 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-// 云开发会自动设置端口
 const port = process.env.PORT || 80;
 
 // 星火API配置 - 使用环境变量
@@ -18,49 +17,39 @@ const sparkConfig = {
     path: "/v1.1/chat",
 };
 
-// 中间件
 app.use(cors());
 app.use(express.json());
 
-// 健康检查端点
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// 生成星火API鉴权URL
 function generateAuthUrl() {
     const host = sparkConfig.host;
     const path = sparkConfig.path;
     const date = new Date().toUTCString();
-    
-    // 生成签名字符串
+
     const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
-    
-    // 使用HMAC-SHA256算法加密
+
     const signatureSha = CryptoJS.HmacSHA256(signatureOrigin, sparkConfig.APISecret);
     const signature = CryptoJS.enc.Base64.stringify(signatureSha);
-    
-    // 生成authorization
+
     const authorizationOrigin = `api_key="${sparkConfig.APIKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
     const authorization = Buffer.from(authorizationOrigin).toString('base64');
-    
-    // 生成最终URL
+
     return `wss://${host}${path}?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${encodeURIComponent(host)}`;
 }
 
-// 聊天端点
 app.post('/chat', async (req, res) => {
     try {
         const { message, celebrity, history, systemPrompt } = req.body;
-        
-        // 创建WebSocket连接
+
         const authUrl = generateAuthUrl();
         const ws = new WebSocket(authUrl);
         
         let responseText = '';
         let resolved = false;
-        
-        // 设置超时
+
         const timeout = setTimeout(() => {
             if (!resolved) {
                 resolved = true;
@@ -70,10 +59,10 @@ app.post('/chat', async (req, res) => {
                     error: '请求超时' 
                 });
             }
-        }, 15000); // 15秒超时
+        }, 15000); 
         
         ws.on('open', () => {
-            // 准备请求数据
+
             const requestData = {
                 header: {
                     app_id: sparkConfig.APPID,
@@ -116,11 +105,9 @@ app.post('/chat', async (req, res) => {
                 });
                 return;
             }
-            
-            // 累加响应文本
+
             responseText += response.payload.choices.text[0].content;
-            
-            // 如果是最终结果
+  
             if (response.header.status === 2) {
                 clearTimeout(timeout);
                 resolved = true;
