@@ -458,12 +458,10 @@
                 : 'https://celebrity-chat-agent.vercel.app/'
         };
         
-        // 全局变量
         let selectedCelebrity = "jay";
         let conversationHistory = [];
         let isApiConnected = false;
         
-        // DOM元素
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -476,14 +474,12 @@
         const statusText = apiStatus.querySelector('span');
         const celebrityButtons = document.querySelectorAll('.celebrity-btn');
         
-        // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             loadConversationHistory();
             setupEventListeners();
             checkApiConnection();
         });
         
-        // 设置事件监听器
         function setupEventListeners() {
             sendBtn.addEventListener('click', sendMessage);
             userInput.addEventListener('keypress', function(e) {
@@ -507,17 +503,14 @@
                 button.addEventListener('click', function() {
                     selectedCelebrity = this.dataset.celebrity;
                     
-                    // 更新UI
                     celebrityButtons.forEach(btn => btn.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // 添加系统消息
                     addMessage(`已切换到${getCelebrityName(selectedCelebrity)}模式，来和我聊天吧！`, 'bot');
                 });
             });
         }
         
-        // 检查API连接状态
         async function checkApiConnection() {
             updateApiStatus('检查中', 'connecting');
             
@@ -527,14 +520,11 @@
                     isApiConnected = true;
                     updateApiStatus('已连接', 'connected');
                     
-                    // 清除系统消息
                     const systemMessages = chatMessages.querySelectorAll('.system-message');
                     systemMessages.forEach(msg => msg.remove());
                     
-                    // 添加欢迎消息
                     addMessage(`嗨！我是${getCelebrityName(selectedCelebrity)}，很高兴和你聊天！`, 'bot');
                     
-                    // 启用输入框和按钮
                     userInput.disabled = false;
                     sendBtn.disabled = false;
                     userInput.placeholder = "输入消息...";
@@ -554,7 +544,6 @@
             }
         }
         
-        // 获取明星名称
         function getCelebrityName(celebrityId) {
             const names = {
                 'jay': '周杰伦',
@@ -564,7 +553,6 @@
             return names[celebrityId] || '未知明星';
         }
         
-        // 获取明星特定的提示词
         function getCelebrityPrompt(celebrityId) {
             const prompts = {
                 'jay': `你是周杰伦（Jay Chou），华语流行乐坛的超级巨星。你以独特的唱腔、音乐才华和创作能力闻名。你说话带有台湾腔，喜欢用"哎哟，不错哦"、"嗯哼"等口头禅。你热爱音乐、篮球、电影和魔术。回答时要体现你的音乐才华和偶尔的俏皮幽默，保持简短随性的风格。`,
@@ -574,7 +562,6 @@
             return prompts[celebrityId] || '你是一位受欢迎的明星。';
         }
         
-        // 发送消息到后端API
         async function sendMessage() {
             const message = userInput.value.trim();
             if (!message) return;
@@ -586,27 +573,22 @@
             
             // 添加到聊天界面
             addMessage(message, 'user');
-            
-            // 保存到对话历史
+
             conversationHistory.push({ role: 'user', content: message });
             saveConversationHistory();
-            
-            // 清空输入框
+
             userInput.value = '';
-            
-            // 显示打字指示器
+
             showTyping();
             
             try {
-                // 准备请求数据
                 const requestData = {
                     message: message,
                     celebrity: selectedCelebrity,
                     history: conversationHistory.slice(-6), // 发送最近6条对话作为上下文
                     systemPrompt: getCelebrityPrompt(selectedCelebrity)
                 };
-                
-                // 发送请求到后端
+
                 const response = await fetch(`${config.apiBaseUrl}/chat`, {
                     method: 'POST',
                     headers: {
@@ -635,12 +617,10 @@
                 console.error('发送消息失败:', error);
                 addMessage("发送消息时发生错误，请重试。", 'error');
             } finally {
-                // 隐藏打字指示器
                 hideTyping();
             }
         }
-        
-        // 添加消息到聊天界面
+
         function addMessage(text, sender) {
             const messageElement = document.createElement('div');
             
@@ -671,43 +651,36 @@
             messageElement.appendChild(messageInfo);
             
             chatMessages.appendChild(messageElement);
-            
-            // 滚动到底部
+
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-        
-        // 显示打字指示器
+
         function showTyping() {
             typingIndicator.style.display = 'block';
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-        
-        // 隐藏打字指示器
+
         function hideTyping() {
             typingIndicator.style.display = 'none';
         }
-        
-        // 更新API状态
+
         function updateApiStatus(status, statusClass) {
             statusText.textContent = `API${status}`;
             statusDot.className = 'status-dot ' + statusClass;
         }
-        
-        // 保存对话历史
+
         function saveConversationHistory() {
             localStorage.setItem('celebrityChatHistory', JSON.stringify(conversationHistory));
             localStorage.setItem('selectedCelebrity', selectedCelebrity);
         }
-        
-        // 加载对话历史
+
         function loadConversationHistory() {
             const savedHistory = localStorage.getItem('celebrityChatHistory');
             const savedCelebrity = localStorage.getItem('selectedCelebrity');
             
             if (savedHistory) {
                 conversationHistory = JSON.parse(savedHistory);
-                
-                // 重新渲染历史消息
+
                 conversationHistory.forEach(msg => {
                     addMessage(msg.content, msg.role === 'user' ? 'user' : 'bot');
                 });
@@ -715,8 +688,7 @@
             
             if (savedCelebrity) {
                 selectedCelebrity = savedCelebrity;
-                
-                // 更新UI
+
                 celebrityButtons.forEach(btn => {
                     btn.classList.remove('active');
                     if (btn.dataset.celebrity === selectedCelebrity) {
@@ -725,14 +697,12 @@
                 });
             }
         }
-        
-        // 清除对话
+
         function clearConversation() {
             conversationHistory = [];
             chatMessages.innerHTML = '';
             localStorage.removeItem('celebrityChatHistory');
-            
-            // 添加欢迎消息
+
             addMessage(`聊天记录已清除，我是${getCelebrityName(selectedCelebrity)}，来和我聊天吧！`, 'bot');
         }
     </script>
